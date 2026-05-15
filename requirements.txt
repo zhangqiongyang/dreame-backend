@@ -1,0 +1,16 @@
+# Core
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic-settings>=2.6.0
+
+# DB — MySQL 8（异步 API 用 aiomysql；Alembic 迁移常用 pymysql 同步）
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+aiomysql>=0.2.0
+pymysql>=1.1.0
+
+python-multipart>=0.0.17
+httpx>=0.28.0
+
+# Dev
+pytest>=8.0.0
