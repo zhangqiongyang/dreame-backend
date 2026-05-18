@@ -21,13 +21,13 @@ async def list_refunds(
 
 @router.post("/refunds/{refund_id}/approve", response_model=ApiResponse)
 async def approve_refund(
-    refund_id: int, body: RefundAuditIn, db: DbSession
+    refund_id: str, body: RefundAuditIn, db: DbSession
 ) -> ApiResponse:
     await refund_service.approve_refund(db, refund_id, body.auditRemark)
     return success()
 
 
 @router.post("/refunds/{refund_id}/reject", response_model=ApiResponse)
-async def reject_refund(refund_id: int, body: RefundAuditIn, db: DbSession) -> ApiResponse:
+async def reject_refund(refund_id: str, body: RefundAuditIn, db: DbSession) -> ApiResponse:
     await refund_service.reject_refund(db, refund_id, body.auditRemark)
     return success()

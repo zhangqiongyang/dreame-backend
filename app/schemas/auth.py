@@ -8,7 +8,7 @@ class WechatLoginIn(BaseModel):
 
 
 class UserOut(BaseModel):
-    id: int
+    id: str
     nickname: Optional[str]
     avatarUrl: Optional[str]
     phone: Optional[str]

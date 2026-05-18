@@ -25,6 +25,6 @@ async def list_users(
 
 
 @router.patch("/users/{user_id}/status", response_model=ApiResponse)
-async def update_user_status(user_id: int, body: UserStatusIn, db: DbSession) -> ApiResponse:
+async def update_user_status(user_id: str, body: UserStatusIn, db: DbSession) -> ApiResponse:
     await admin_service.set_user_status(db, user_id, body.status)
     return success()

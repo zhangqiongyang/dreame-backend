@@ -18,7 +18,8 @@ class Settings(BaseSettings):
 
     wechat_appid: str = ""
     wechat_secret: str = ""
-    wechat_mock: bool = True
+    # 未配置 AppID/Secret 时自动走 Mock；三者齐全且 MOCK=false 时调微信 jscode2session
+    wechat_mock: bool = False
 
     jwt_secret: str = "change-me-in-production"
     jwt_expire_seconds: int = 604800

@@ -29,6 +29,19 @@ docker compose up -d db
 
 详见 `docker-compose.yml` 与数据库教学文档中的说明。
 
+## 业务编号规则
+
+对外 API 的 `id` 与路径参数均使用业务编号（非数据库自增主键）：
+
+| 实体 | 格式 | 示例 |
+|------|------|------|
+| 用户 | `U` + yyyyMMdd + 8 位随机数字 | `U2026051812345678` |
+| 订单 | `DR` + yyyyMMdd + 8 位随机数字 | `DR2026051812345678` |
+| 退款 | `RF` + yyyyMMdd + 8 位随机数字 | `RF2026051812345678` |
+| 商品 | `P` + yyyyMMdd + 8 位随机数字 | `P2026051812345678` |
+
+生成逻辑见 `app/utils/ids.py`。历史用户需执行 `alembic upgrade head` 回填 `user_no`。
+
 ## 目录说明
 
 | 路径 | 作用 |
@@ -58,9 +71,11 @@ alembic upgrade head
 - 登录后请求头：`Authorization: Bearer <token>`
 - 仍兼容直接传 `ADMIN_TOKEN` 作为 Bearer（脚本/调试）
 
-## 小程序登录（开发）
+## 小程序登录
 
-未配置 `WECHAT_APPID` 时自动 **Mock**：`POST /api/v1/auth/wechat` 的 `code` 会映射为 `mock_<code>` 的 openid。
+配置 `WECHAT_APPID`、`WECHAT_SECRET` 且 `WECHAT_MOCK=false` 后走微信 `jscode2session`。详见 [微信小程序登录配置](docs/微信小程序登录配置.md)。
+
+未配置时自动 **Mock**（openid 为 `mock_` 前缀）。
 
 ## 与前端项目
 

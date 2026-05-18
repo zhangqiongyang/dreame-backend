@@ -72,6 +72,7 @@ async def list_admin_orders(
         kw = f"%{keyword.strip()}%"
         q = q.where(
             (Order.order_no.like(kw))
+            | (User.user_no.like(kw))
             | (User.nickname.like(kw))
             | (User.phone.like(kw))
             | (Order.receiver_phone.like(kw))
@@ -86,10 +87,10 @@ async def list_admin_orders(
     result = await session.execute(q.offset(offset).limit(min(page_size, 100)))
     rows = []
     for order, user in result.all():
-        name = user.nickname or order.receiver_name or f"用户{user.id}"
+        name = user.nickname or order.receiver_name or f"用户{user.user_no}"
         rows.append(
             AdminOrderRowOut(
-                id=str(order.id),
+                id=order.order_no,
                 orderNo=order.order_no,
                 user=name,
                 amount=cents_to_yuan(order.pay_amount_cents),
@@ -100,8 +101,8 @@ async def list_admin_orders(
     return rows
 
 
-async def get_admin_order_detail(session: AsyncSession, order_id: int) -> Dict[str, Any]:
-    order = await _load_order(session, order_id)
+async def get_admin_order_detail(session: AsyncSession, order_no: str) -> Dict[str, Any]:
+    order = await _load_order(session, order_no)
     detail = order_to_detail(order, mask_receiver_phone=False)
     logs = sorted(order.status_logs, key=lambda x: x.created_at)
     return {
@@ -125,7 +126,12 @@ async def list_users(
     q = select(User).order_by(User.created_at.desc())
     if keyword:
         kw = f"%{keyword.strip()}%"
-        q = q.where((User.nickname.like(kw)) | (User.phone.like(kw)) | (User.openid.like(kw)))
+        q = q.where(
+            (User.user_no.like(kw))
+            | (User.nickname.like(kw))
+            | (User.phone.like(kw))
+            | (User.openid.like(kw))
+        )
 
     offset = max(page - 1, 0) * page_size
     users = (await session.execute(q.offset(offset).limit(min(page_size, 100)))).scalars().all()
@@ -145,11 +151,11 @@ async def list_users(
                 Order.status.not_in([OrderStatus.CLOSED, OrderStatus.REFUNDED]),
             )
         )
-        name = user.nickname or f"用户{user.id}"
+        name = user.nickname or f"用户{user.user_no}"
         phone = mask_phone(user.phone) if user.phone else "—"
         rows.append(
             AdminUserRowOut(
-                id=str(user.id),
+                id=user.user_no,
                 name=name,
                 phone=phone,
                 orders=order_count or 0,
@@ -159,10 +165,11 @@ async def list_users(
     return rows
 
 
-async def set_user_status(session: AsyncSession, user_id: int, status: str) -> None:
+async def set_user_status(session: AsyncSession, user_no: str, status: str) -> None:
     if status not in (UserStatus.ACTIVE, UserStatus.DISABLED):
         raise BusinessError("用户状态无效")
-    user = await session.get(User, user_id)
+    result = await session.execute(select(User).where(User.user_no == user_no))
+    user = result.scalar_one_or_none()
     if user is None:
         raise BusinessError("用户不存在")
     user.status = status

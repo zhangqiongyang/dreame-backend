@@ -10,18 +10,18 @@ router = APIRouter(prefix="", tags=["refunds"])
 
 @router.get("/orders/{order_id}/refund-eligibility", response_model=ApiResponse[RefundEligibilityOut])
 async def refund_eligibility(
-    order_id: int, db: DbSession, user: CurrentUser
+    order_id: str, db: DbSession, user: CurrentUser
 ) -> ApiResponse[RefundEligibilityOut]:
     return success(await refund_service.check_eligibility(db, user, order_id))
 
 
 @router.post("/orders/{order_id}/refunds", response_model=ApiResponse[RefundDetailOut])
 async def create_refund(
-    order_id: int, body: CreateRefundIn, db: DbSession, user: CurrentUser
+    order_id: str, body: CreateRefundIn, db: DbSession, user: CurrentUser
 ) -> ApiResponse[RefundDetailOut]:
     return success(await refund_service.create_refund(db, user, order_id, body))
 
 
 @router.get("/refunds/{refund_id}", response_model=ApiResponse[RefundDetailOut])
-async def get_refund(refund_id: int, db: DbSession, user: CurrentUser) -> ApiResponse[RefundDetailOut]:
+async def get_refund(refund_id: str, db: DbSession, user: CurrentUser) -> ApiResponse[RefundDetailOut]:
     return success(await refund_service.get_refund(db, user, refund_id))

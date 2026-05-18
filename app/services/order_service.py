@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import List, Optional
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,26 +21,16 @@ from app.schemas.order import (
     ShipmentOut,
 )
 from app.utils.datetime_util import format_dt, utcnow
+from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan, mask_phone
 
 
-async def _next_serial(session: AsyncSession, prefix: str) -> str:
-    result = await session.execute(
-        select(func.max(Order.order_no)).where(Order.order_no.like(f"{prefix}%"))
-    )
-    last = result.scalar_one_or_none()
-    seq = 1
-    if last and len(last) > len(prefix):
-        try:
-            seq = int(last[len(prefix) :]) + 1
-        except ValueError:
-            seq = 1
-    return f"{prefix}{seq:04d}"
-
-
 async def generate_order_no(session: AsyncSession) -> str:
-    today = utcnow().strftime("%Y%m%d")
-    return await _next_serial(session, f"DR{today}")
+    async def exists(no: str) -> bool:
+        r = await session.execute(select(Order.id).where(Order.order_no == no).limit(1))
+        return r.scalar_one_or_none() is not None
+
+    return await generate_unique_id(session, IdPrefix.ORDER, exists_query=exists)
 
 
 async def _log_status(
@@ -74,7 +64,7 @@ def _first_item(order: Order) -> OrderItem:
 def order_to_list_item(order: Order) -> OrderListItemOut:
     item = _first_item(order)
     return OrderListItemOut(
-        id=str(order.id),
+        id=order.order_no,
         orderNo=order.order_no,
         status=ORDER_STATUS_LABEL.get(order.status, order.status),
         title=item.title,
@@ -94,7 +84,7 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
     if order.refund and order.status == OrderStatus.REFUNDED:
         refund_reason = order.refund.reason
     return OrderDetailOut(
-        id=str(order.id),
+        id=order.order_no,
         orderNo=order.order_no,
         status=order.status,
         statusLabel=ORDER_STATUS_LABEL.get(order.status, order.status),
@@ -119,11 +109,11 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
 
 
 async def _load_order(
-    session: AsyncSession, order_id: int, user_id: Optional[int] = None
+    session: AsyncSession, order_no: str, user_id: Optional[int] = None
 ) -> Order:
     q = (
         select(Order)
-        .where(Order.id == order_id)
+        .where(Order.order_no == order_no)
         .options(
             selectinload(Order.items),
             selectinload(Order.shipment),
@@ -179,16 +169,16 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
         )
     )
     await _log_status(
-        session, order, None, OrderStatus.PENDING_PAYMENT, "user", str(user.id), "用户提交订单"
+        session, order, None, OrderStatus.PENDING_PAYMENT, "user", user.user_no, "用户提交订单"
     )
     await session.commit()
 
-    order = await _load_order(session, order.id, user.id)
+    order = await _load_order(session, order.order_no, user.id)
     return order_to_detail(order)
 
 
-async def pay_mock(session: AsyncSession, user: User, order_id: int) -> PayMockOut:
-    order = await _load_order(session, order_id, user.id)
+async def pay_mock(session: AsyncSession, user: User, order_no: str) -> PayMockOut:
+    order = await _load_order(session, order_no, user.id)
     if order.status == OrderStatus.PENDING_SHIPPING:
         return PayMockOut(
             orderNo=order.order_no,
@@ -206,7 +196,7 @@ async def pay_mock(session: AsyncSession, user: User, order_id: int) -> PayMockO
     order.status = OrderStatus.PENDING_SHIPPING
     order.payment_method = "wechat_mock"
     order.paid_at = now
-    await _log_status(session, order, prev, order.status, "user", str(user.id), "假支付成功")
+    await _log_status(session, order, prev, order.status, "user", user.user_no, "假支付成功")
     await session.commit()
 
     return PayMockOut(
@@ -216,14 +206,14 @@ async def pay_mock(session: AsyncSession, user: User, order_id: int) -> PayMockO
     )
 
 
-async def cancel_order(session: AsyncSession, user: User, order_id: int) -> None:
-    order = await _load_order(session, order_id, user.id)
+async def cancel_order(session: AsyncSession, user: User, order_no: str) -> None:
+    order = await _load_order(session, order_no, user.id)
     if order.status != OrderStatus.PENDING_PAYMENT:
         raise BusinessError("仅待付款订单可取消")
     prev = order.status
     order.status = OrderStatus.CLOSED
     order.closed_at = utcnow()
-    await _log_status(session, order, prev, order.status, "user", str(user.id), "用户取消订单")
+    await _log_status(session, order, prev, order.status, "user", user.user_no, "用户取消订单")
     await session.commit()
 
 
@@ -281,15 +271,15 @@ async def list_orders(
     return [order_to_list_item(o) for o in result.scalars().unique().all()]
 
 
-async def get_order_detail(session: AsyncSession, user: User, order_id: int) -> OrderDetailOut:
-    order = await _load_order(session, order_id, user.id)
+async def get_order_detail(session: AsyncSession, user: User, order_no: str) -> OrderDetailOut:
+    order = await _load_order(session, order_no, user.id)
     return order_to_detail(order)
 
 
 async def ship_order(
-    session: AsyncSession, order_id: int, carrier: str, tracking_no: str
+    session: AsyncSession, order_no: str, carrier: str, tracking_no: str
 ) -> OrderDetailOut:
-    order = await _load_order(session, order_id)
+    order = await _load_order(session, order_no)
     if order.status == OrderStatus.SHIPPED:
         return order_to_detail(order, mask_receiver_phone=False)
     if order.status != OrderStatus.PENDING_SHIPPING:
@@ -306,7 +296,7 @@ async def ship_order(
         session, order, prev, order.status, "admin", None, f"{carrier} {tracking_no}"
     )
     await session.commit()
-    order = await _load_order(session, order_id)
+    order = await _load_order(session, order_no)
     return order_to_detail(order, mask_receiver_phone=False)
 
 

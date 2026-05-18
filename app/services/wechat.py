@@ -6,8 +6,17 @@ from app.core.config import settings
 from app.core.exceptions import BusinessError
 
 
+_WX_ERR_HINT = {
+    40029: "登录码无效或已过期，请重新打开小程序",
+    40163: "登录码已被使用，请重试",
+    40226: "高风险用户，无法登录",
+    -1: "微信服务繁忙，请稍后再试",
+}
+
+
 async def code_to_session(code: str) -> dict[str, Any]:
-    if settings.wechat_mock or not settings.wechat_appid or not settings.wechat_secret:
+    use_mock = settings.wechat_mock or not settings.wechat_appid or not settings.wechat_secret
+    if use_mock:
         return {
             "openid": f"mock_{code[:32]}",
             "session_key": "mock_session_key",
@@ -26,7 +35,10 @@ async def code_to_session(code: str) -> dict[str, Any]:
         data = resp.json()
 
     if data.get("errcode"):
-        raise BusinessError(data.get("errmsg", "微信登录失败"))
+        errcode = int(data.get("errcode", 0))
+        hint = _WX_ERR_HINT.get(errcode)
+        msg = hint or data.get("errmsg") or "微信登录失败"
+        raise BusinessError(msg)
 
     if not data.get("openid"):
         raise BusinessError("微信登录码无效")

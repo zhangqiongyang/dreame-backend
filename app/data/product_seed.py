@@ -1,8 +1,10 @@
 """与 dreame-web-mini catalog 对齐的商品种子数据（price 为元，写入 DB 时转分）。"""
 
+from app.data.product_ids import PRODUCT_ID_STANDARD, PRODUCT_ID_STATION, PRODUCT_ID_X1_PRO
+
 PRODUCT_SEEDS = [
     {
-        "id": "c1-standard",
+        "id": PRODUCT_ID_STANDARD,
         "name": "追觅C1 标准版",
         "price": 1599,
         "market_price": 1899,
@@ -30,7 +32,7 @@ PRODUCT_SEEDS = [
         ],
     },
     {
-        "id": "c1-station",
+        "id": PRODUCT_ID_STATION,
         "name": "追觅C1 Station 基站版",
         "price": 3499,
         "market_price": 3999,
@@ -58,7 +60,7 @@ PRODUCT_SEEDS = [
         ],
     },
     {
-        "id": "x1-pro",
+        "id": PRODUCT_ID_X1_PRO,
         "name": "追觅X1 Pro 旗舰款",
         "price": 2699,
         "market_price": 2999,

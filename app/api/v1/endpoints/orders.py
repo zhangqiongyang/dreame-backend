@@ -33,16 +33,16 @@ async def list_orders(
 
 
 @router.get("/{order_id}", response_model=ApiResponse[OrderDetailOut])
-async def get_order(order_id: int, db: DbSession, user: CurrentUser) -> ApiResponse[OrderDetailOut]:
+async def get_order(order_id: str, db: DbSession, user: CurrentUser) -> ApiResponse[OrderDetailOut]:
     return success(await order_service.get_order_detail(db, user, order_id))
 
 
 @router.post("/{order_id}/pay-mock", response_model=ApiResponse[PayMockOut])
-async def pay_mock(order_id: int, db: DbSession, user: CurrentUser) -> ApiResponse[PayMockOut]:
+async def pay_mock(order_id: str, db: DbSession, user: CurrentUser) -> ApiResponse[PayMockOut]:
     return success(await order_service.pay_mock(db, user, order_id))
 
 
 @router.post("/{order_id}/cancel", response_model=ApiResponse)
-async def cancel_order(order_id: int, db: DbSession, user: CurrentUser) -> ApiResponse:
+async def cancel_order(order_id: str, db: DbSession, user: CurrentUser) -> ApiResponse:
     await order_service.cancel_order(db, user, order_id)
     return success()

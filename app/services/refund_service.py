@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -20,27 +20,20 @@ from app.schemas.admin import AdminRefundRowOut
 from app.schemas.refund import CreateRefundIn, RefundDetailOut, RefundEligibilityOut, RefundStepOut
 from app.services.order_service import _load_order, _log_status
 from app.utils.datetime_util import format_dt, utcnow
+from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan
 
 
 async def generate_refund_no(session: AsyncSession) -> str:
-    today = utcnow().strftime("%Y%m%d")
-    prefix = f"RF{today}"
-    result = await session.execute(
-        select(func.max(Refund.refund_no)).where(Refund.refund_no.like(f"{prefix}%"))
-    )
-    last = result.scalar_one_or_none()
-    seq = 1
-    if last and len(last) > len(prefix):
-        try:
-            seq = int(last[len(prefix) :]) + 1
-        except ValueError:
-            seq = 1
-    return f"{prefix}{seq:04d}"
+    async def exists(no: str) -> bool:
+        r = await session.execute(select(Refund.id).where(Refund.refund_no == no).limit(1))
+        return r.scalar_one_or_none() is not None
+
+    return await generate_unique_id(session, IdPrefix.REFUND, exists_query=exists)
 
 
-async def check_eligibility(session: AsyncSession, user: User, order_id: int) -> RefundEligibilityOut:
-    order = await _load_order(session, order_id, user.id)
+async def check_eligibility(session: AsyncSession, user: User, order_no: str) -> RefundEligibilityOut:
+    order = await _load_order(session, order_no, user.id)
     if order.status == OrderStatus.SHIPPED:
         return RefundEligibilityOut(canApply=False, message="已发货，暂不支持在线退款")
     if order.status in (OrderStatus.COMPLETED, OrderStatus.CLOSED, OrderStatus.REFUNDED):
@@ -123,10 +116,11 @@ def _build_steps(refund: Refund) -> List[RefundStepOut]:
 
 
 def refund_to_detail(refund: Refund) -> RefundDetailOut:
+    order_no = refund.order.order_no if refund.order else str(refund.order_id)
     return RefundDetailOut(
-        id=str(refund.id),
+        id=refund.refund_no,
         refundNo=refund.refund_no,
-        orderId=str(refund.order_id),
+        orderId=order_no,
         status=refund.status,
         statusLabel=REFUND_STATUS_LABEL.get(refund.status, refund.status),
         amount=cents_to_yuan(refund.amount_cents),
@@ -137,16 +131,16 @@ def refund_to_detail(refund: Refund) -> RefundDetailOut:
 
 
 async def create_refund(
-    session: AsyncSession, user: User, order_id: int, body: CreateRefundIn
+    session: AsyncSession, user: User, order_no: str, body: CreateRefundIn
 ) -> RefundDetailOut:
     if body.reason not in REFUND_REASONS:
         raise BusinessError("退款原因无效")
 
-    eligible = await check_eligibility(session, user, order_id)
+    eligible = await check_eligibility(session, user, order_no)
     if not eligible.canApply:
         raise BusinessError(eligible.message)
 
-    order = await _load_order(session, order_id, user.id)
+    order = await _load_order(session, order_no, user.id)
     now = utcnow()
     refund_no = await generate_refund_no(session)
 
@@ -182,17 +176,17 @@ async def create_refund(
     result = await session.execute(
         select(Refund)
         .where(Refund.id == refund.id)
-        .options(selectinload(Refund.status_logs))
+        .options(selectinload(Refund.status_logs), selectinload(Refund.order))
     )
     refund = result.scalar_one()
     return refund_to_detail(refund)
 
 
-async def get_refund(session: AsyncSession, user: User, refund_id: int) -> RefundDetailOut:
+async def get_refund(session: AsyncSession, user: User, refund_no: str) -> RefundDetailOut:
     result = await session.execute(
         select(Refund)
-        .where(Refund.id == refund_id, Refund.user_id == user.id)
-        .options(selectinload(Refund.status_logs))
+        .where(Refund.refund_no == refund_no, Refund.user_id == user.id)
+        .options(selectinload(Refund.status_logs), selectinload(Refund.order))
     )
     refund = result.scalar_one_or_none()
     if refund is None:
@@ -200,12 +194,12 @@ async def get_refund(session: AsyncSession, user: User, refund_id: int) -> Refun
     return refund_to_detail(refund)
 
 
-async def approve_refund(session: AsyncSession, refund_id: int, remark: Optional[str]) -> None:
-    refund = await _get_refund_admin(session, refund_id)
+async def approve_refund(session: AsyncSession, refund_no: str, remark: Optional[str]) -> None:
+    refund = await _get_refund_admin(session, refund_no)
     if refund.status != RefundStatus.PENDING:
         raise BusinessError("退款单已处理")
 
-    order = await _load_order(session, refund.order_id)
+    order = await _load_order(session, refund.order.order_no)
     now = utcnow()
     refund.status = RefundStatus.APPROVED
     refund.audit_remark = remark
@@ -220,8 +214,8 @@ async def approve_refund(session: AsyncSession, refund_id: int, remark: Optional
     await session.commit()
 
 
-async def reject_refund(session: AsyncSession, refund_id: int, remark: Optional[str]) -> None:
-    refund = await _get_refund_admin(session, refund_id)
+async def reject_refund(session: AsyncSession, refund_no: str, remark: Optional[str]) -> None:
+    refund = await _get_refund_admin(session, refund_no)
     if refund.status != RefundStatus.PENDING:
         raise BusinessError("退款单已处理")
 
@@ -235,8 +229,13 @@ async def reject_refund(session: AsyncSession, refund_id: int, remark: Optional[
     await session.commit()
 
 
-async def _get_refund_admin(session: AsyncSession, refund_id: int) -> Refund:
-    refund = await session.get(Refund, refund_id)
+async def _get_refund_admin(session: AsyncSession, refund_no: str) -> Refund:
+    result = await session.execute(
+        select(Refund)
+        .where(Refund.refund_no == refund_no)
+        .options(selectinload(Refund.order))
+    )
+    refund = result.scalar_one_or_none()
     if refund is None:
         raise BusinessError("退款单不存在")
     return refund
@@ -259,10 +258,10 @@ async def list_refunds_admin(
     result = await session.execute(q)
     rows = []
     for refund, order, user in result.all():
-        name = user.nickname or f"用户{user.id}"
+        name = user.nickname or f"用户{user.user_no}"
         rows.append(
             AdminRefundRowOut(
-                id=str(refund.id),
+                id=refund.refund_no,
                 refundNo=refund.refund_no,
                 orderNo=order.order_no,
                 user=name,

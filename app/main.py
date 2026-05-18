@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -12,11 +13,40 @@ from app.core.exceptions import BusinessError, UnauthorizedError
 from app.core.response import fail
 from app.tasks.order_expire import order_maintenance_loop
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
 logger = logging.getLogger(__name__)
+
+_wechat_mode_label: str = ""
+
+
+def _resolve_wechat_mode() -> str:
+    if settings.wechat_mock or not settings.wechat_appid or not settings.wechat_secret:
+        return "mock"
+    return "production"
+
+
+def _log_wechat_mode() -> None:
+    global _wechat_mode_label
+    mode = _resolve_wechat_mode()
+    _wechat_mode_label = mode
+    if mode == "mock":
+        msg = "微信登录: Mock 模式（未配置 WECHAT_APPID/SECRET 或 WECHAT_MOCK=true）"
+        logger.warning(msg)
+        print(msg, flush=True)
+    else:
+        msg = f"微信登录: 正式模式 appid={settings.wechat_appid[:8]}…"
+        logger.info(msg)
+        print(msg, flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _log_wechat_mode()
     stop_event = asyncio.Event()
     task = None
     if settings.database_url:
@@ -68,5 +98,10 @@ app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict:
+    mode = _wechat_mode_label or _resolve_wechat_mode()
+    return {
+        "status": "ok",
+        "wechatLogin": mode,
+        "wechatAppId": settings.wechat_appid[:8] + "…" if settings.wechat_appid else "",
+    }

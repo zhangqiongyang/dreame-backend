@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,15 +13,24 @@ from app.models.user import User
 from app.schemas.auth import ProfileUpdateIn, UserOut, WechatLoginOut
 from app.services import wechat as wechat_client
 from app.utils.datetime_util import utcnow
+from app.utils.ids import IdPrefix, generate_unique_id, is_valid_business_id
 
 
 def user_to_out(user: User) -> UserOut:
     return UserOut(
-        id=user.id,
+        id=user.user_no,
         nickname=user.nickname,
         avatarUrl=user.avatar_url,
         phone=user.phone,
     )
+
+
+async def _allocate_user_no(session: AsyncSession) -> str:
+    async def exists(no: str) -> bool:
+        r = await session.execute(select(User.id).where(User.user_no == no).limit(1))
+        return r.scalar_one_or_none() is not None
+
+    return await generate_unique_id(session, IdPrefix.USER, exists_query=exists)
 
 
 async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginOut:
@@ -32,6 +43,7 @@ async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginO
 
     if user is None:
         user = User(
+            user_no=await _allocate_user_no(session),
             openid=openid,
             unionid=wx.get("unionid"),
             session_key=wx.get("session_key"),
@@ -49,7 +61,7 @@ async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginO
     await session.commit()
     await session.refresh(user)
 
-    token = create_access_token(str(user.id))
+    token = create_access_token(user.user_no)
     return WechatLoginOut(
         token=token,
         expiresIn=settings.jwt_expire_seconds,
@@ -60,11 +72,20 @@ async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginO
 async def get_user_from_token(session: AsyncSession, token: str) -> User:
     try:
         payload = decode_access_token(token)
-        user_id = int(payload["sub"])
+        sub = payload["sub"]
     except Exception as exc:
         raise UnauthorizedError() from exc
 
-    user = await session.get(User, user_id)
+    user: Optional[User] = None
+    if isinstance(sub, str) and is_valid_business_id(sub, IdPrefix.USER):
+        result = await session.execute(select(User).where(User.user_no == sub))
+        user = result.scalar_one_or_none()
+    else:
+        try:
+            user = await session.get(User, int(sub))
+        except (TypeError, ValueError):
+            user = None
+
     if user is None or user.status == UserStatus.DISABLED:
         raise UnauthorizedError()
     return user

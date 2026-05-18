@@ -12,6 +12,7 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_no: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     openid: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     unionid: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     nickname: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

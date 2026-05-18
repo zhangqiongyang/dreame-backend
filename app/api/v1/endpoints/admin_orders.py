@@ -29,13 +29,13 @@ async def list_orders(
 
 
 @router.get("/orders/{order_id}")
-async def get_order(order_id: int, db: DbSession) -> ApiResponse:
+async def get_order(order_id: str, db: DbSession) -> ApiResponse:
     return success(await admin_service.get_admin_order_detail(db, order_id))
 
 
 @router.post("/orders/{order_id}/ship", response_model=ApiResponse[OrderDetailOut])
 async def ship_order(
-    order_id: int, body: ShipOrderIn, db: DbSession
+    order_id: str, body: ShipOrderIn, db: DbSession
 ) -> ApiResponse[OrderDetailOut]:
     data = await order_service.ship_order(db, order_id, body.carrier, body.trackingNo)
     return success(data)
