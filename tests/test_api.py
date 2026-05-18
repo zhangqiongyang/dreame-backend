@@ -24,6 +24,26 @@ def test_wechat_login_mock():
     assert body["data"]["token"]
 
 
+def test_admin_login_success():
+    r = client.post(
+        "/api/v1/admin/auth/login",
+        json={"username": "admin", "password": "admin123"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["code"] == 200
+    assert body["data"]["token"]
+
+
+def test_admin_login_wrong_password():
+    r = client.post(
+        "/api/v1/admin/auth/login",
+        json={"username": "admin", "password": "wrong"},
+    )
+    assert r.status_code == 200
+    assert r.json()["code"] == 500
+
+
 def test_products_list_envelope():
     r = client.get("/api/v1/products")
     assert r.status_code in (200, 500)

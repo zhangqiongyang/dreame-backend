@@ -54,7 +54,9 @@ alembic upgrade head
 
 ## 管理端鉴权
 
-请求头：`Authorization: Bearer <ADMIN_TOKEN>`（默认见 `.env.example` 的 `dreame-admin-dev`）。
+- 登录：`POST /api/v1/admin/auth/login`（body: `username` / `password`，默认见 `.env.example`）
+- 登录后请求头：`Authorization: Bearer <token>`
+- 仍兼容直接传 `ADMIN_TOKEN` 作为 Bearer（脚本/调试）
 
 ## 小程序登录（开发）
 

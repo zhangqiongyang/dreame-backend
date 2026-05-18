@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     jwt_expire_seconds: int = 604800
 
     admin_token: str = "dreame-admin-dev"
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+    admin_display_name: str = "Admin User"
 
     order_expire_hours: int = 24
     auto_complete_shipped_days: int = 7

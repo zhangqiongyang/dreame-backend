@@ -3,6 +3,23 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class AdminLoginIn(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AdminUserOut(BaseModel):
+    username: str
+    displayName: str
+    role: str
+
+
+class AdminLoginOut(BaseModel):
+    token: str
+    expiresIn: int
+    user: AdminUserOut
+
+
 class DashboardOut(BaseModel):
     todayOrders: int
     todaySales: int
