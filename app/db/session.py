@@ -17,6 +17,7 @@ def _ensure_engine() -> None:
             settings.database_url,
             pool_pre_ping=True,
             echo=settings.debug,
+            connect_args={"init_command": "SET time_zone='+08:00'"},
         )
         _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 

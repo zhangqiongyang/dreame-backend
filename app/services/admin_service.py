@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
@@ -13,16 +13,15 @@ from app.models.order import Order
 from app.models.user import User
 from app.schemas.admin import AdminOrderRowOut, AdminUserRowOut, DashboardOut
 from app.services.order_service import _load_order, _resolve_status_filter, order_to_detail
-from app.utils.datetime_util import format_dt
+from app.utils.datetime_util import format_dt, now_cn
 from app.utils.money import cents_to_yuan, mask_phone
 
 
-def _shanghai_today_range() -> tuple:
-    tz = timezone(timedelta(hours=8))
-    now = datetime.now(tz)
-    start = datetime.combine(now.date(), time.min, tzinfo=tz)
+def _shanghai_today_range() -> tuple[datetime, datetime]:
+    now = now_cn()
+    start = datetime.combine(now.date(), time.min)
     end = start + timedelta(days=1)
-    return start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+    return start, end
 
 
 async def get_dashboard(session: AsyncSession) -> DashboardOut:

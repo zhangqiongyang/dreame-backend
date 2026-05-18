@@ -1,28 +1,32 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
+
+# 库内 DATETIME 与业务展示均使用北京时间（东八区，naive）
+TZ_CN = ZoneInfo("Asia/Shanghai")
 
 
-def utcnow() -> datetime:
-    """当前 UTC 时间（timezone-aware）。"""
-    return datetime.now(timezone.utc)
+def now_cn() -> datetime:
+    """当前北京时间（无时区标记，直接写入 MySQL DATETIME）。"""
+    return datetime.now(TZ_CN).replace(tzinfo=None)
 
 
-def as_utc(dt: datetime) -> datetime:
-    """将 datetime 规范为 UTC aware（MySQL 读出的 naive 按 UTC 解释）。"""
+def as_cn(dt: datetime) -> datetime:
+    """规范为北京时间 naive（从库读出或带时区的值）。"""
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def utcnow_naive() -> datetime:
-    """与 MySQL DATETIME 往返一致的 naive UTC，用于 SQL 条件比较。"""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+        return dt
+    return dt.astimezone(TZ_CN).replace(tzinfo=None)
 
 
 def format_dt(dt: Optional[datetime]) -> Optional[str]:
+    """格式化为 yyyy-MM-dd HH:mm（已是北京时间则直接格式化）。"""
     if dt is None:
         return None
-    local = as_utc(dt).astimezone()
-    return local.strftime("%Y-%m-%d %H:%M")
+    return as_cn(dt).strftime("%Y-%m-%d %H:%M")
+
+
+# 兼容旧调用名
+utcnow = now_cn
+utcnow_naive = now_cn

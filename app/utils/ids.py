@@ -38,7 +38,9 @@ _PREFIX_PATTERN = {
 
 
 def generate_business_id(prefix: IdPrefix, *, at: Optional[datetime] = None) -> str:
-    day = (at or datetime.now()).strftime("%Y%m%d")
+    from app.utils.datetime_util import now_cn
+
+    day = (at or now_cn()).strftime("%Y%m%d")
     suffix = "".join(secrets.choice("0123456789") for _ in range(8))
     return f"{prefix.value}{day}{suffix}"
 

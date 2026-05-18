@@ -19,7 +19,7 @@ from app.models.user import User
 from app.schemas.admin import AdminRefundRowOut
 from app.schemas.refund import CreateRefundIn, RefundDetailOut, RefundEligibilityOut, RefundStepOut
 from app.services.order_service import _load_order, _log_status
-from app.utils.datetime_util import format_dt, utcnow
+from app.utils.datetime_util import format_dt, now_cn
 from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan
 
@@ -144,7 +144,7 @@ async def create_refund(
         raise BusinessError(eligible.message)
 
     order = await _load_order(session, order_no, user.id)
-    now = utcnow()
+    now = now_cn()
     refund_no = await generate_refund_no(session)
 
     refund = Refund(
@@ -206,7 +206,7 @@ async def approve_refund(session: AsyncSession, refund_no: str, remark: Optional
         raise BusinessError("退款单已处理")
 
     order = await _load_order(session, refund.order.order_no)
-    now = utcnow()
+    now = now_cn()
     refund.status = RefundStatus.APPROVED
     refund.audit_remark = remark
     refund.audited_at = now
@@ -225,7 +225,7 @@ async def reject_refund(session: AsyncSession, refund_no: str, remark: Optional[
     if refund.status != RefundStatus.PENDING:
         raise BusinessError("退款单已处理")
 
-    now = utcnow()
+    now = now_cn()
     refund.status = RefundStatus.REJECTED
     refund.audit_remark = remark
     refund.audited_at = now

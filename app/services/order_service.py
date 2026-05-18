@@ -23,7 +23,7 @@ from app.schemas.order import (
 )
 from app.schemas.refund import OrderRefundOut
 from app.core.constants import REFUND_STATUS_LABEL
-from app.utils.datetime_util import as_utc, format_dt, utcnow, utcnow_naive
+from app.utils.datetime_util import format_dt, now_cn
 from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan, mask_phone
 
@@ -53,7 +53,7 @@ async def _log_status(
             operator_type=operator_type,
             operator_id=operator_id,
             remark=remark,
-            created_at=utcnow(),
+            created_at=now_cn(),
         )
     )
 
@@ -155,7 +155,7 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
     line_cents = product.price_cents * body.qty
     freight_cents = 0
     pay_cents = line_cents + freight_cents
-    now = utcnow()
+    now = now_cn()
     order_no = await generate_order_no(session)
 
     order = Order(
@@ -205,10 +205,10 @@ async def pay_mock(session: AsyncSession, user: User, order_no: str) -> PayMockO
     if order.status != OrderStatus.PENDING_PAYMENT:
         raise BusinessError("当前订单状态不可支付")
 
-    if order.expire_at and as_utc(utcnow()) > as_utc(order.expire_at):
+    if order.expire_at and now_cn() > order.expire_at:
         raise BusinessError("订单已超时，请重新下单")
 
-    now = utcnow()
+    now = now_cn()
     prev = order.status
     order.status = OrderStatus.PENDING_SHIPPING
     order.payment_method = "wechat_mock"
@@ -229,7 +229,7 @@ async def cancel_order(session: AsyncSession, user: User, order_no: str) -> None
         raise BusinessError("仅待付款订单可取消")
     prev = order.status
     order.status = OrderStatus.CLOSED
-    order.closed_at = utcnow()
+    order.closed_at = now_cn()
     await _log_status(session, order, prev, order.status, "user", user.user_no, "用户取消订单")
     await session.commit()
 
@@ -308,7 +308,7 @@ async def ship_order(
     if order.status != OrderStatus.PENDING_SHIPPING:
         raise BusinessError("仅待发货订单可发货")
 
-    now = utcnow()
+    now = now_cn()
     prev = order.status
     order.status = OrderStatus.SHIPPED
     order.shipped_at = now
@@ -324,7 +324,7 @@ async def ship_order(
 
 
 async def close_expired_orders(session: AsyncSession) -> int:
-    now = utcnow_naive()
+    now = now_cn()
     result = await session.execute(
         select(Order).where(
             Order.status == OrderStatus.PENDING_PAYMENT,
@@ -346,7 +346,7 @@ async def close_expired_orders(session: AsyncSession) -> int:
 
 
 async def auto_complete_shipped_orders(session: AsyncSession) -> int:
-    cutoff = utcnow_naive() - timedelta(days=settings.auto_complete_shipped_days)
+    cutoff = now_cn() - timedelta(days=settings.auto_complete_shipped_days)
     result = await session.execute(
         select(Order).where(
             Order.status == OrderStatus.SHIPPED,
@@ -359,7 +359,7 @@ async def auto_complete_shipped_orders(session: AsyncSession) -> int:
     for order in orders:
         prev = order.status
         order.status = OrderStatus.COMPLETED
-        order.completed_at = utcnow()
+        order.completed_at = now_cn()
         await _log_status(session, order, prev, order.status, "system", None, "自动确认收货")
         count += 1
     if count:

@@ -1,11 +1,18 @@
 from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 固定指向 dreame-backend/.env，避免从仓库根目录启动时读不到配置而误走 Mock
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_ENV_FILE = _BACKEND_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -33,6 +40,15 @@ class Settings(BaseSettings):
     auto_complete_shipped_days: int = 7
 
     cors_origins: str = "*"
+
+    @field_validator("wechat_mock", mode="before")
+    @classmethod
+    def _parse_bool(cls, v: Any) -> bool:
+        if isinstance(v, bool):
+            return v
+        if v is None:
+            return False
+        return str(v).strip().lower() in ("1", "true", "yes", "on")
 
 
 @lru_cache

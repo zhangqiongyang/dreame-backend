@@ -12,7 +12,8 @@ from app.core.security import create_access_token, decode_access_token
 from app.models.user import User
 from app.schemas.auth import ProfileUpdateIn, UserOut, WechatLoginOut
 from app.services import wechat as wechat_client
-from app.utils.datetime_util import utcnow
+from app.services.wechat import is_wechat_mock_mode
+from app.utils.datetime_util import now_cn
 from app.utils.ids import IdPrefix, generate_unique_id, is_valid_business_id
 
 
@@ -36,10 +37,12 @@ async def _allocate_user_no(session: AsyncSession) -> str:
 async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginOut:
     wx = await wechat_client.code_to_session(code)
     openid = wx["openid"]
+    if not is_wechat_mock_mode() and str(openid).startswith("mock_"):
+        raise BusinessError("微信登录异常，请检查后端 AppID/Secret 配置")
 
     result = await session.execute(select(User).where(User.openid == openid))
     user = result.scalar_one_or_none()
-    now = utcnow()
+    now = now_cn()
 
     if user is None:
         user = User(

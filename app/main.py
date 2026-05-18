@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
-from app.core.config import settings
+from app.core.config import _ENV_FILE, settings
+from app.services.wechat import is_wechat_mock_mode, wechat_mock_reason
 from app.core.exceptions import BusinessError, UnauthorizedError
 from app.core.response import fail
 from app.tasks.order_expire import order_maintenance_loop
@@ -25,7 +26,7 @@ _wechat_mode_label: str = ""
 
 
 def _resolve_wechat_mode() -> str:
-    if settings.wechat_mock or not settings.wechat_appid or not settings.wechat_secret:
+    if is_wechat_mock_mode():
         return "mock"
     return "production"
 
@@ -34,12 +35,14 @@ def _log_wechat_mode() -> None:
     global _wechat_mode_label
     mode = _resolve_wechat_mode()
     _wechat_mode_label = mode
+    env_hint = f"env={_ENV_FILE} exists={_ENV_FILE.is_file()}"
     if mode == "mock":
-        msg = "微信登录: Mock 模式（未配置 WECHAT_APPID/SECRET 或 WECHAT_MOCK=true）"
+        reason = wechat_mock_reason()
+        msg = f"微信登录: Mock 模式（{reason}）| {env_hint}"
         logger.warning(msg)
         print(msg, flush=True)
     else:
-        msg = f"微信登录: 正式模式 appid={settings.wechat_appid[:8]}…"
+        msg = f"微信登录: 正式模式 appid={settings.wechat_appid[:8]}… | {env_hint}"
         logger.info(msg)
         print(msg, flush=True)
 
