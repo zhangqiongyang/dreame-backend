@@ -46,6 +46,7 @@ async def check_eligibility(session: AsyncSession, user: User, order_no: str) ->
         canApply=True,
         message="未发货，可退全款",
         refundAmount=cents_to_yuan(order.pay_amount_cents),
+        reasons=REFUND_REASONS,
     )
 
 

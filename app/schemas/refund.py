@@ -7,6 +7,7 @@ class RefundEligibilityOut(BaseModel):
     canApply: bool
     message: str
     refundAmount: Optional[int] = None
+    reasons: Optional[List[str]] = None
 
 
 class CreateRefundIn(BaseModel):

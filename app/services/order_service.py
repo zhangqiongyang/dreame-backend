@@ -20,7 +20,7 @@ from app.schemas.order import (
     PayMockOut,
     ShipmentOut,
 )
-from app.utils.datetime_util import format_dt, utcnow
+from app.utils.datetime_util import as_utc, format_dt, utcnow, utcnow_naive
 from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan, mask_phone
 
@@ -188,7 +188,7 @@ async def pay_mock(session: AsyncSession, user: User, order_no: str) -> PayMockO
     if order.status != OrderStatus.PENDING_PAYMENT:
         raise BusinessError("当前订单状态不可支付")
 
-    if order.expire_at and utcnow() > order.expire_at:
+    if order.expire_at and as_utc(utcnow()) > as_utc(order.expire_at):
         raise BusinessError("订单已超时，请重新下单")
 
     now = utcnow()
@@ -301,7 +301,7 @@ async def ship_order(
 
 
 async def close_expired_orders(session: AsyncSession) -> int:
-    now = utcnow()
+    now = utcnow_naive()
     result = await session.execute(
         select(Order).where(
             Order.status == OrderStatus.PENDING_PAYMENT,
@@ -323,7 +323,7 @@ async def close_expired_orders(session: AsyncSession) -> int:
 
 
 async def auto_complete_shipped_orders(session: AsyncSession) -> int:
-    cutoff = utcnow() - timedelta(days=settings.auto_complete_shipped_days)
+    cutoff = utcnow_naive() - timedelta(days=settings.auto_complete_shipped_days)
     result = await session.execute(
         select(Order).where(
             Order.status == OrderStatus.SHIPPED,
