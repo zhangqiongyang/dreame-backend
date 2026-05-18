@@ -1,4 +1,5 @@
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,11 +13,22 @@ class Settings(BaseSettings):
     app_name: str = "Dreame API"
     debug: bool = True
 
-    # 应用异步连接：mysql+aiomysql://...
     database_url: str = ""
-
-    # Alembic 同步连接：mysql+pymysql://...
     database_url_sync: str = ""
+
+    wechat_appid: str = ""
+    wechat_secret: str = ""
+    wechat_mock: bool = True
+
+    jwt_secret: str = "change-me-in-production"
+    jwt_expire_seconds: int = 604800
+
+    admin_token: str = "dreame-admin-dev"
+
+    order_expire_hours: int = 24
+    auto_complete_shipped_days: int = 7
+
+    cors_origins: str = "*"
 
 
 @lru_cache

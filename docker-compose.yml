@@ -1,7 +1,8 @@
 # 本地：仅 MySQL（开发）。在 dreame-backend 目录执行：docker compose up -d db
 services:
   db:
-    image: mysql:8.4
+    # 使用 8.0 LTS 系列，国内部分镜像站对 8.4 同步不完整易 403；与 MySQL 8 兼容
+    image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: rootdev
       MYSQL_DATABASE: dreame
