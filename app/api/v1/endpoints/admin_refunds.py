@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import DbSession, verify_admin
 from app.core.response import ApiResponse, success
-from app.schemas.admin import RefundAuditIn
+from app.schemas.admin import AdminRefundDetailOut, RefundAuditIn
 from app.services import refund_service
 
 router = APIRouter(prefix="/admin", tags=["admin-refunds"], dependencies=[Depends(verify_admin)])
@@ -17,6 +17,11 @@ async def list_refunds(
     db: DbSession, status: Optional[str] = Query(default=None)
 ) -> ApiResponse:
     return success(await refund_service.list_refunds_admin(db, status=status))
+
+
+@router.get("/refunds/{refund_id}", response_model=ApiResponse[AdminRefundDetailOut])
+async def get_refund_detail(refund_id: str, db: DbSession) -> ApiResponse[AdminRefundDetailOut]:
+    return success(await refund_service.get_admin_refund_detail(db, refund_id))
 
 
 @router.post("/refunds/{refund_id}/approve", response_model=ApiResponse)

@@ -16,7 +16,8 @@ from app.core.exceptions import BusinessError
 from app.models.order import Order
 from app.models.refund import Refund, RefundStatusLog
 from app.models.user import User
-from app.schemas.admin import AdminRefundRowOut
+from app.schemas.admin import AdminRefundDetailOut, AdminRefundRowOut, AdminRefundUserOut
+from app.services.order_service import order_to_detail
 from app.schemas.refund import CreateRefundIn, RefundDetailOut, RefundEligibilityOut, RefundStepOut
 from app.services.order_service import _load_order, _log_status
 from app.utils.datetime_util import format_dt, now_cn
@@ -242,16 +243,52 @@ async def reject_refund(session: AsyncSession, refund_no: str, remark: Optional[
     await session.commit()
 
 
+def _resolve_refund_list_tab(status: Optional[str]) -> str:
+    if not status or status.strip() in ("", "全部", "all"):
+        return "all"
+    tab = status.strip()
+    if tab in ("pending", "待审核"):
+        return "pending"
+    if tab in ("done", "已处理", "processed"):
+        return "processed"
+    if tab in ("approved", "已通过"):
+        return "approved"
+    if tab in ("rejected", "已拒绝"):
+        return "rejected"
+    return "all"
+
+
 async def _get_refund_admin(session: AsyncSession, refund_no: str) -> Refund:
     result = await session.execute(
         select(Refund)
         .where(Refund.refund_no == refund_no)
-        .options(selectinload(Refund.order))
+        .options(
+            selectinload(Refund.order),
+            selectinload(Refund.status_logs),
+        )
     )
     refund = result.scalar_one_or_none()
     if refund is None:
         raise BusinessError("退款单不存在")
     return refund
+
+
+async def get_admin_refund_detail(session: AsyncSession, refund_no: str) -> AdminRefundDetailOut:
+    refund = await _get_refund_admin(session, refund_no)
+    order = await _load_order(session, refund.order.order_no)
+    user = await session.get(User, refund.user_id)
+    if user is None:
+        raise BusinessError("用户不存在")
+
+    return AdminRefundDetailOut(
+        refund=refund_to_detail(refund),
+        order=order_to_detail(order, mask_receiver_phone=False),
+        user=AdminRefundUserOut(
+            userNo=user.user_no,
+            nickname=user.nickname,
+            phone=user.phone,
+        ),
+    )
 
 
 async def list_refunds_admin(
@@ -263,10 +300,15 @@ async def list_refunds_admin(
         .join(User, Refund.user_id == User.id)
         .order_by(Refund.created_at.desc())
     )
-    if status in ("pending", "待审核"):
+    tab = _resolve_refund_list_tab(status)
+    if tab == "pending":
         q = q.where(Refund.status == RefundStatus.PENDING)
-    elif status in ("approved", "rejected", "已处理", "已拒绝"):
-        q = q.where(Refund.status != RefundStatus.PENDING)
+    elif tab == "processed":
+        q = q.where(Refund.status.in_([RefundStatus.APPROVED, RefundStatus.REJECTED]))
+    elif tab == "approved":
+        q = q.where(Refund.status == RefundStatus.APPROVED)
+    elif tab == "rejected":
+        q = q.where(Refund.status == RefundStatus.REJECTED)
 
     result = await session.execute(q)
     rows = []
@@ -277,10 +319,13 @@ async def list_refunds_admin(
                 id=refund.refund_no,
                 refundNo=refund.refund_no,
                 orderNo=order.order_no,
+                orderId=order.order_no,
                 user=name,
                 amount=cents_to_yuan(refund.amount_cents),
                 reason=refund.reason,
                 status=REFUND_STATUS_LABEL.get(refund.status, refund.status),
+                statusCode=refund.status,
+                createdAt=format_dt(refund.created_at) or "",
             )
         )
     return rows

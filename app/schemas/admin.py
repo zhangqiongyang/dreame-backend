@@ -2,6 +2,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.order import OrderDetailOut
+from app.schemas.refund import RefundDetailOut
+
 
 class AdminLoginIn(BaseModel):
     username: str = Field(min_length=1, max_length=64)
@@ -49,10 +52,25 @@ class AdminRefundRowOut(BaseModel):
     id: str
     refundNo: str
     orderNo: str
+    orderId: str
     user: str
     amount: int
     reason: str
     status: str
+    statusCode: str
+    createdAt: str
+
+
+class AdminRefundUserOut(BaseModel):
+    userNo: str
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class AdminRefundDetailOut(BaseModel):
+    refund: RefundDetailOut
+    order: OrderDetailOut
+    user: AdminRefundUserOut
 
 
 class AdminUserRowOut(BaseModel):
