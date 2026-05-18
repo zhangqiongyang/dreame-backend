@@ -38,6 +38,8 @@ async def check_eligibility(session: AsyncSession, user: User, order_no: str) ->
         return RefundEligibilityOut(canApply=False, message="已发货，暂不支持在线退款")
     if order.status in (OrderStatus.COMPLETED, OrderStatus.CLOSED, OrderStatus.REFUNDED):
         return RefundEligibilityOut(canApply=False, message="当前订单状态不可申请退款")
+    if order.status == OrderStatus.REFUND_PENDING:
+        return RefundEligibilityOut(canApply=False, message="已有进行中的退款申请")
     if order.status != OrderStatus.PENDING_SHIPPING:
         return RefundEligibilityOut(canApply=False, message="仅待发货订单可申请退款")
     if order.refund and order.refund.status == RefundStatus.PENDING:
@@ -172,6 +174,9 @@ async def create_refund(
             created_at=now,
         )
     )
+    prev = order.status
+    order.status = OrderStatus.REFUND_PENDING
+    await _log_status(session, order, prev, order.status, "user", user.user_no, "用户申请退款")
     await session.commit()
 
     result = await session.execute(
@@ -227,6 +232,13 @@ async def reject_refund(session: AsyncSession, refund_no: str, remark: Optional[
     session.add(
         RefundStatusLog(refund_id=refund.id, status=RefundStatus.REJECTED, remark=remark, created_at=now)
     )
+    order = await _load_order(session, refund.order.order_no)
+    if order.status == OrderStatus.REFUND_PENDING:
+        prev = order.status
+        order.status = OrderStatus.PENDING_SHIPPING
+        await _log_status(
+            session, order, prev, order.status, "admin", None, "退款审核驳回，恢复待发货"
+        )
     await session.commit()
 
 

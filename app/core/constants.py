@@ -9,6 +9,7 @@ class UserStatus(str, Enum):
 class OrderStatus(str, Enum):
     PENDING_PAYMENT = "pending_payment"
     PENDING_SHIPPING = "pending_shipping"
+    REFUND_PENDING = "refund_pending"
     SHIPPED = "shipped"
     COMPLETED = "completed"
     CLOSED = "closed"
@@ -18,6 +19,7 @@ class OrderStatus(str, Enum):
 ORDER_STATUS_LABEL: dict[str, str] = {
     OrderStatus.PENDING_PAYMENT: "待付款",
     OrderStatus.PENDING_SHIPPING: "待发货",
+    OrderStatus.REFUND_PENDING: "退款审核中",
     OrderStatus.SHIPPED: "已发货",
     OrderStatus.COMPLETED: "已完成",
     OrderStatus.CLOSED: "已关闭",

@@ -13,6 +13,7 @@ from app.core.exceptions import BusinessError
 from app.models.order import Order, OrderItem, OrderStatusLog, Shipment
 from app.models.product import Product
 from app.models.user import User
+from app.models.refund import Refund
 from app.schemas.order import (
     CreateOrderIn,
     OrderDetailOut,
@@ -20,6 +21,8 @@ from app.schemas.order import (
     PayMockOut,
     ShipmentOut,
 )
+from app.schemas.refund import OrderRefundOut
+from app.core.constants import REFUND_STATUS_LABEL
 from app.utils.datetime_util import as_utc, format_dt, utcnow, utcnow_naive
 from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan, mask_phone
@@ -81,8 +84,21 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
     if order.shipment:
         shipment = ShipmentOut(carrier=order.shipment.carrier, trackingNo=order.shipment.tracking_no)
     refund_reason = None
-    if order.refund and order.status == OrderStatus.REFUNDED:
-        refund_reason = order.refund.reason
+    refund_out = None
+    if order.refund:
+        from app.services.refund_service import _build_steps
+
+        r = order.refund
+        refund_reason = r.reason
+        refund_out = OrderRefundOut(
+            refundNo=r.refund_no,
+            status=r.status,
+            statusLabel=REFUND_STATUS_LABEL.get(r.status, r.status),
+            amount=cents_to_yuan(r.amount_cents),
+            reason=r.reason,
+            reasonText=r.reason_text,
+            steps=_build_steps(r),
+        )
     return OrderDetailOut(
         id=order.order_no,
         orderNo=order.order_no,
@@ -105,6 +121,7 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
         payAmount=cents_to_yuan(order.pay_amount_cents),
         shipment=shipment,
         refundReason=refund_reason,
+        refund=refund_out,
     )
 
 
@@ -117,7 +134,7 @@ async def _load_order(
         .options(
             selectinload(Order.items),
             selectinload(Order.shipment),
-            selectinload(Order.refund),
+            selectinload(Order.refund).selectinload(Refund.status_logs),
             selectinload(Order.status_logs),
         )
     )
@@ -231,6 +248,9 @@ def _resolve_status_filter(tab: str) -> Optional[str]:
         "closed": OrderStatus.CLOSED,
         "已退款": OrderStatus.REFUNDED,
         "refunded": OrderStatus.REFUNDED,
+        "退款审核中": OrderStatus.REFUND_PENDING,
+        "refund_pending": OrderStatus.REFUND_PENDING,
+        "售后": OrderStatus.REFUND_PENDING,
     }
     if tab in mapping:
         return mapping[tab]
@@ -259,8 +279,9 @@ async def list_orders(
     if status:
         tab = status.strip()
         if tab in ("售后", "after_sale"):
-            refund_order_ids = select(Refund.order_id)
-            q = q.where(or_(Order.status == OrderStatus.REFUNDED, Order.id.in_(refund_order_ids)))
+            q = q.where(
+                Order.status.in_([OrderStatus.REFUNDED, OrderStatus.REFUND_PENDING])
+            )
         else:
             code = _resolve_status_filter(tab)
             if code:
@@ -282,6 +303,8 @@ async def ship_order(
     order = await _load_order(session, order_no)
     if order.status == OrderStatus.SHIPPED:
         return order_to_detail(order, mask_receiver_phone=False)
+    if order.status == OrderStatus.REFUND_PENDING:
+        raise BusinessError("订单退款审核中，暂不可发货")
     if order.status != OrderStatus.PENDING_SHIPPING:
         raise BusinessError("仅待发货订单可发货")
 

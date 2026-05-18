@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ReceiverIn
+from app.schemas.refund import OrderRefundOut
 
 
 class CreateOrderIn(BaseModel):
@@ -49,6 +50,7 @@ class OrderDetailOut(BaseModel):
     payAmount: int
     shipment: Optional[ShipmentOut] = None
     refundReason: Optional[str] = None
+    refund: Optional[OrderRefundOut] = None
 
 
 class PayMockOut(BaseModel):

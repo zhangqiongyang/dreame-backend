@@ -23,6 +23,18 @@ class RefundStepOut(BaseModel):
     active: bool
 
 
+class OrderRefundOut(BaseModel):
+    """订单详情内嵌的退款/售后信息。"""
+
+    refundNo: str
+    status: str
+    statusLabel: str
+    amount: int
+    reason: str
+    reasonText: Optional[str] = None
+    steps: List[RefundStepOut]
+
+
 class RefundDetailOut(BaseModel):
     id: str
     refundNo: str
