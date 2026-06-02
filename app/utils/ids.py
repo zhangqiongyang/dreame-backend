@@ -6,6 +6,7 @@
 | 订单 | DR | DR + yyyyMMdd + 8位随机数字 | DR2026051812345678 |
 | 退款 | RF | RF + yyyyMMdd + 8位随机数字 | RF2026051812345678 |
 | 商品 | P  | P + yyyyMMdd + 8位随机数字 | P2026051812345678 |
+| 地址 | A  | A + yyyyMMdd + 8位随机数字 | A2026051812345678 |
 
 随机段使用 secrets，碰撞时由调用方重试。
 """
@@ -27,6 +28,7 @@ class IdPrefix(str, Enum):
     ORDER = "DR"
     REFUND = "RF"
     PRODUCT = "P"
+    ADDRESS = "A"
 
 
 _PREFIX_PATTERN = {
@@ -34,6 +36,7 @@ _PREFIX_PATTERN = {
     IdPrefix.ORDER: re.compile(r"^DR\d{16}$"),
     IdPrefix.REFUND: re.compile(r"^RF\d{16}$"),
     IdPrefix.PRODUCT: re.compile(r"^P\d{16}$"),
+    IdPrefix.ADDRESS: re.compile(r"^A\d{16}$"),
 }
 
 

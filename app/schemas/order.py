@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.common import ReceiverIn
 from app.schemas.refund import OrderRefundOut
@@ -10,7 +10,14 @@ class CreateOrderIn(BaseModel):
     productId: str = Field(min_length=1)
     qty: int = Field(default=1, ge=1, le=99)
     remark: Optional[str] = Field(default=None, max_length=255)
-    receiver: ReceiverIn
+    addressId: Optional[str] = Field(default=None, min_length=1)
+    receiver: Optional[ReceiverIn] = None
+
+    @model_validator(mode="after")
+    def require_address_or_receiver(self) -> "CreateOrderIn":
+        if not self.addressId and self.receiver is None:
+            raise ValueError("请选择收货地址或填写收件信息")
+        return self
 
 
 class OrderListItemOut(BaseModel):

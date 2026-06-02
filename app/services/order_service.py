@@ -22,6 +22,7 @@ from app.schemas.order import (
     ShipmentOut,
 )
 from app.schemas.refund import OrderRefundOut
+from app.services import address_service
 from app.core.constants import REFUND_STATUS_LABEL
 from app.utils.datetime_util import format_dt, now_cn
 from app.utils.ids import IdPrefix, generate_unique_id
@@ -152,6 +153,10 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
     if product is None or product.status != "active":
         raise BusinessError("商品不存在或已下架")
 
+    receiver = await address_service.resolve_receiver(
+        session, user, address_id=body.addressId, receiver=body.receiver
+    )
+
     line_cents = product.price_cents * body.qty
     freight_cents = 0
     pay_cents = line_cents + freight_cents
@@ -166,9 +171,9 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
         freight_amount_cents=freight_cents,
         pay_amount_cents=pay_cents,
         remark=body.remark,
-        receiver_name=body.receiver.name,
-        receiver_phone=body.receiver.phone,
-        receiver_address=body.receiver.full_address(),
+        receiver_name=receiver.name,
+        receiver_phone=receiver.phone,
+        receiver_address=receiver.full_address(),
         expire_at=now + timedelta(hours=settings.order_expire_hours),
     )
     session.add(order)

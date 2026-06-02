@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    addresses,
     admin_auth,
     admin_dashboard,
     admin_orders,
@@ -16,6 +17,7 @@ from app.api.v1.endpoints import (
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(addresses.router)
 api_router.include_router(products.router)
 api_router.include_router(orders.router)
 api_router.include_router(refunds.router)

@@ -21,3 +21,8 @@ def test_generate_business_id_format():
     assert product_id.startswith("P")
     assert len(product_id) == 17
     assert is_valid_business_id(product_id, IdPrefix.PRODUCT)
+
+    address_no = generate_business_id(IdPrefix.ADDRESS)
+    assert address_no.startswith("A")
+    assert len(address_no) == 17
+    assert is_valid_business_id(address_no, IdPrefix.ADDRESS)

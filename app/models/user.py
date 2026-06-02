@@ -23,3 +23,6 @@ class User(Base, TimestampMixin):
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     orders: Mapped[List["Order"]] = relationship(back_populates="user")  # noqa: F821
+    addresses: Mapped[List["UserAddress"]] = relationship(  # noqa: F821
+        back_populates="user", cascade="all, delete-orphan"
+    )
