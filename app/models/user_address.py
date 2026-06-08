@@ -9,7 +9,9 @@ class UserAddress(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     address_no: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("users.user_no", ondelete="CASCADE"), index=True, nullable=False
+    )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     province: Mapped[str] = mapped_column(String(32), nullable=False, default="")
@@ -18,4 +20,7 @@ class UserAddress(Base, TimestampMixin):
     detail: Mapped[str] = mapped_column(String(255), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    user: Mapped["User"] = relationship(back_populates="addresses")  # noqa: F821
+    user: Mapped["User"] = relationship(
+        back_populates="addresses",
+        foreign_keys=[user_id],
+    )  # noqa: F821

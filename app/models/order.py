@@ -12,7 +12,9 @@ class Order(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_no: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("users.user_no"), index=True, nullable=False
+    )
     status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     product_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     freight_amount_cents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -28,7 +30,10 @@ class Order(Base, TimestampMixin):
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     expire_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="orders")  # noqa: F821
+    user: Mapped["User"] = relationship(
+        back_populates="orders",
+        foreign_keys=[user_id],
+    )  # noqa: F821
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     shipment: Mapped[Optional["Shipment"]] = relationship(back_populates="order", uselist=False)
     status_logs: Mapped[List["OrderStatusLog"]] = relationship(

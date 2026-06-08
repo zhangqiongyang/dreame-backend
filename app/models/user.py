@@ -22,7 +22,14 @@ class User(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(16), default=UserStatus.ACTIVE, nullable=False)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    orders: Mapped[List["Order"]] = relationship(back_populates="user")  # noqa: F821
-    addresses: Mapped[List["UserAddress"]] = relationship(  # noqa: F821
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    orders: Mapped[List["Order"]] = relationship(
+        back_populates="user",
+        foreign_keys="Order.user_id",
+        primaryjoin="User.user_no == foreign(Order.user_id)",
+    )  # noqa: F821
+    addresses: Mapped[List["UserAddress"]] = relationship(
+        back_populates="user",
+        foreign_keys="UserAddress.user_id",
+        primaryjoin="User.user_no == foreign(UserAddress.user_id)",
+        cascade="all, delete-orphan",
+    )  # noqa: F821

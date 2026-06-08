@@ -72,7 +72,7 @@ async def list_admin_orders(
 ) -> List[AdminOrderRowOut]:
     q = (
         select(Order, User)
-        .join(User, Order.user_id == User.id)
+        .join(User, Order.user_id == User.user_no)
         .options(selectinload(Order.items))
         .order_by(Order.created_at.desc())
     )
@@ -156,13 +156,13 @@ async def list_users(
     for user in users:
         order_count = await session.scalar(
             select(func.count(Order.id)).where(
-                Order.user_id == user.id,
+                Order.user_id == user.user_no,
                 Order.status.not_in([OrderStatus.CLOSED, OrderStatus.PENDING_PAYMENT]),
             )
         )
         spent_cents = await session.scalar(
             select(func.coalesce(func.sum(Order.pay_amount_cents), 0)).where(
-                Order.user_id == user.id,
+                Order.user_id == user.user_no,
                 Order.paid_at.is_not(None),
                 Order.status.not_in([OrderStatus.CLOSED, OrderStatus.REFUNDED]),
             )

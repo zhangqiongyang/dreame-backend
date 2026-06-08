@@ -127,7 +127,7 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
 
 
 async def _load_order(
-    session: AsyncSession, order_no: str, user_id: Optional[int] = None
+    session: AsyncSession, order_no: str, user_no: Optional[str] = None
 ) -> Order:
     q = (
         select(Order)
@@ -139,8 +139,8 @@ async def _load_order(
             selectinload(Order.status_logs),
         )
     )
-    if user_id is not None:
-        q = q.where(Order.user_id == user_id)
+    if user_no is not None:
+        q = q.where(Order.user_id == user_no)
     result = await session.execute(q)
     order = result.scalar_one_or_none()
     if order is None:
@@ -165,7 +165,7 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
 
     order = Order(
         order_no=order_no,
-        user_id=user.id,
+        user_id=user.user_no,
         status=OrderStatus.PENDING_PAYMENT,
         product_amount_cents=line_cents,
         freight_amount_cents=freight_cents,
@@ -195,12 +195,12 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
     )
     await session.commit()
 
-    order = await _load_order(session, order.order_no, user.id)
+    order = await _load_order(session, order.order_no, user.user_no)
     return order_to_detail(order)
 
 
 async def pay_mock(session: AsyncSession, user: User, order_no: str) -> PayMockOut:
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     if order.status == OrderStatus.PENDING_SHIPPING:
         return PayMockOut(
             orderNo=order.order_no,
@@ -229,7 +229,7 @@ async def pay_mock(session: AsyncSession, user: User, order_no: str) -> PayMockO
 
 
 async def cancel_order(session: AsyncSession, user: User, order_no: str) -> None:
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     if order.status != OrderStatus.PENDING_PAYMENT:
         raise BusinessError("仅待付款订单可取消")
     prev = order.status
@@ -277,7 +277,7 @@ async def list_orders(
 
     q = (
         select(Order)
-        .where(Order.user_id == user.id)
+        .where(Order.user_id == user.user_no)
         .options(selectinload(Order.items), selectinload(Order.refund))
         .order_by(Order.created_at.desc())
     )
@@ -298,7 +298,7 @@ async def list_orders(
 
 
 async def get_order_detail(session: AsyncSession, user: User, order_no: str) -> OrderDetailOut:
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     return order_to_detail(order)
 
 
@@ -331,7 +331,7 @@ async def ship_order(
 async def confirm_receipt(
     session: AsyncSession, user: User, order_no: str
 ) -> OrderDetailOut:
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     if order.status == OrderStatus.COMPLETED:
         return order_to_detail(order)
     if order.status != OrderStatus.SHIPPED:
@@ -345,7 +345,7 @@ async def confirm_receipt(
         session, order, prev, order.status, "user", user.user_no, "用户确认收货"
     )
     await session.commit()
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     return order_to_detail(order)
 
 

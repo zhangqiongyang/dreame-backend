@@ -34,7 +34,7 @@ async def generate_refund_no(session: AsyncSession) -> str:
 
 
 async def check_eligibility(session: AsyncSession, user: User, order_no: str) -> RefundEligibilityOut:
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     if order.status == OrderStatus.SHIPPED:
         return RefundEligibilityOut(canApply=False, message="已发货，暂不支持在线退款")
     if order.status in (OrderStatus.COMPLETED, OrderStatus.CLOSED, OrderStatus.REFUNDED):
@@ -144,14 +144,14 @@ async def create_refund(
     if not eligible.canApply:
         raise BusinessError(eligible.message)
 
-    order = await _load_order(session, order_no, user.id)
+    order = await _load_order(session, order_no, user.user_no)
     now = now_cn()
     refund_no = await generate_refund_no(session)
 
     refund = Refund(
         refund_no=refund_no,
         order_id=order.id,
-        user_id=user.id,
+        user_id=user.user_no,
         amount_cents=order.pay_amount_cents,
         reason=body.reason,
         reason_text=body.reasonText,
@@ -192,7 +192,7 @@ async def create_refund(
 async def get_refund(session: AsyncSession, user: User, refund_no: str) -> RefundDetailOut:
     result = await session.execute(
         select(Refund)
-        .where(Refund.refund_no == refund_no, Refund.user_id == user.id)
+        .where(Refund.refund_no == refund_no, Refund.user_id == user.user_no)
         .options(selectinload(Refund.status_logs), selectinload(Refund.order))
     )
     refund = result.scalar_one_or_none()
@@ -276,7 +276,8 @@ async def _get_refund_admin(session: AsyncSession, refund_no: str) -> Refund:
 async def get_admin_refund_detail(session: AsyncSession, refund_no: str) -> AdminRefundDetailOut:
     refund = await _get_refund_admin(session, refund_no)
     order = await _load_order(session, refund.order.order_no)
-    user = await session.get(User, refund.user_id)
+    result = await session.execute(select(User).where(User.user_no == refund.user_id))
+    user = result.scalar_one_or_none()
     if user is None:
         raise BusinessError("用户不存在")
 
@@ -297,7 +298,7 @@ async def list_refunds_admin(
     q = (
         select(Refund, Order, User)
         .join(Order, Refund.order_id == Order.id)
-        .join(User, Refund.user_id == User.id)
+        .join(User, Refund.user_id == User.user_no)
         .order_by(Refund.created_at.desc())
     )
     tab = _resolve_refund_list_tab(status)

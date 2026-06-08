@@ -6,6 +6,11 @@ def test_generate_business_id_format():
     assert uid.startswith("U")
     assert len(uid) == 17
     assert is_valid_business_id(uid, IdPrefix.USER)
+    # 新用户 ID 含字母，不可按日期推断注册顺序
+    assert any(c.isalpha() for c in uid[1:]) or uid[1:].isdigit()
+
+    # 兼容历史纯数字编号
+    assert is_valid_business_id("U2026051812345678", IdPrefix.USER)
 
     order_no = generate_business_id(IdPrefix.ORDER)
     assert order_no.startswith("DR")

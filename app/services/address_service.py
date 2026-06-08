@@ -50,7 +50,7 @@ async def _get_address_owned(
 ) -> UserAddress:
     result = await session.execute(
         select(UserAddress).where(
-            UserAddress.address_no == address_no, UserAddress.user_id == user.id
+            UserAddress.address_no == address_no, UserAddress.user_id == user.user_no
         )
     )
     addr = result.scalar_one_or_none()
@@ -59,17 +59,17 @@ async def _get_address_owned(
     return addr
 
 
-async def _count_addresses(session: AsyncSession, user_id: int) -> int:
+async def _count_addresses(session: AsyncSession, user_no: str) -> int:
     result = await session.execute(
-        select(UserAddress.id).where(UserAddress.user_id == user_id)
+        select(UserAddress.id).where(UserAddress.user_id == user_no)
     )
     return len(result.all())
 
 
-async def _clear_default(session: AsyncSession, user_id: int) -> None:
+async def _clear_default(session: AsyncSession, user_no: str) -> None:
     await session.execute(
         update(UserAddress)
-        .where(UserAddress.user_id == user_id, UserAddress.is_default.is_(True))
+        .where(UserAddress.user_id == user_no, UserAddress.is_default.is_(True))
         .values(is_default=False)
     )
 
@@ -77,7 +77,7 @@ async def _clear_default(session: AsyncSession, user_id: int) -> None:
 async def list_addresses(session: AsyncSession, user: User) -> List[AddressOut]:
     result = await session.execute(
         select(UserAddress)
-        .where(UserAddress.user_id == user.id)
+        .where(UserAddress.user_id == user.user_no)
         .order_by(UserAddress.is_default.desc(), UserAddress.updated_at.desc())
     )
     return [address_to_out(a) for a in result.scalars().all()]
@@ -91,17 +91,17 @@ async def get_address(session: AsyncSession, user: User, address_no: str) -> Add
 async def create_address(
     session: AsyncSession, user: User, body: AddressCreateIn
 ) -> AddressOut:
-    count = await _count_addresses(session, user.id)
+    count = await _count_addresses(session, user.user_no)
     if count >= MAX_ADDRESSES_PER_USER:
         raise BusinessError(f"最多保存 {MAX_ADDRESSES_PER_USER} 条收货地址")
 
     is_default = body.isDefault or count == 0
     if is_default:
-        await _clear_default(session, user.id)
+        await _clear_default(session, user.user_no)
 
     addr = UserAddress(
         address_no=await generate_address_no(session),
-        user_id=user.id,
+        user_id=user.user_no,
         name=body.name.strip(),
         phone=body.phone.strip(),
         province=body.province.strip(),
@@ -135,7 +135,7 @@ async def update_address(
         addr.detail = body.detail.strip()
 
     if body.isDefault is True:
-        await _clear_default(session, user.id)
+        await _clear_default(session, user.user_no)
         addr.is_default = True
     elif body.isDefault is False and addr.is_default:
         addr.is_default = False
@@ -145,7 +145,7 @@ async def update_address(
 
     if not addr.is_default:
         result = await session.execute(
-            select(UserAddress).where(UserAddress.user_id == user.id)
+            select(UserAddress).where(UserAddress.user_id == user.user_no)
         )
         rows = list(result.scalars().all())
         if rows and not any(a.is_default for a in rows):
@@ -165,7 +165,7 @@ async def delete_address(session: AsyncSession, user: User, address_no: str) -> 
     if was_default:
         result = await session.execute(
             select(UserAddress)
-            .where(UserAddress.user_id == user.id)
+            .where(UserAddress.user_id == user.user_no)
             .order_by(UserAddress.updated_at.desc())
             .limit(1)
         )
@@ -180,7 +180,7 @@ async def set_default_address(
     session: AsyncSession, user: User, address_no: str
 ) -> AddressOut:
     addr = await _get_address_owned(session, user, address_no)
-    await _clear_default(session, user.id)
+    await _clear_default(session, user.user_no)
     addr.is_default = True
     await session.commit()
     await session.refresh(addr)

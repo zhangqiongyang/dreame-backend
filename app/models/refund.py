@@ -13,7 +13,9 @@ class Refund(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     refund_no: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("users.user_no"), index=True, nullable=False
+    )
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str] = mapped_column(String(64), nullable=False)
     reason_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
