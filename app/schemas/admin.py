@@ -34,8 +34,13 @@ class AdminOrderRowOut(BaseModel):
     id: str
     orderNo: str
     user: str
+    userPhone: str = ""
+    productTitle: str = ""
+    qty: int = 1
     amount: int
     status: str
+    statusCode: str = ""
+    orderType: str = "普通订单"
     createdAt: str
 
 
@@ -79,6 +84,9 @@ class AdminUserRowOut(BaseModel):
     phone: str
     orders: int
     spent: int
+    registeredAt: str = ""
+    status: str = "active"
+    statusLabel: str = "活跃"
 
 
 class UserStatusIn(BaseModel):

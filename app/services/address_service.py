@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.user_address import UserAddress
 from app.schemas.address import AddressCreateIn, AddressOut, AddressUpdateIn
 from app.schemas.common import ReceiverIn
+from app.utils.phone import validate_cn_mobile
 from app.utils.ids import IdPrefix, generate_unique_id
 
 MAX_ADDRESSES_PER_USER = 20
@@ -193,7 +194,7 @@ async def resolve_receiver(
         addr = await _get_address_owned(session, user, address_id)
         return ReceiverIn(
             name=addr.name,
-            phone=addr.phone,
+            phone=validate_cn_mobile(addr.phone),
             province=addr.province,
             city=addr.city,
             district=addr.district,

@@ -87,13 +87,21 @@ async def list_admin_orders(
     rows = []
     for order, user in result.all():
         name = user.nickname or order.receiver_name or f"用户{user.user_no}"
+        first_item = order.items[0] if order.items else None
+        product_title = first_item.title if first_item else "—"
+        qty = first_item.qty if first_item else 1
+        phone_raw = user.phone or order.receiver_phone
         rows.append(
             AdminOrderRowOut(
                 id=order.order_no,
                 orderNo=order.order_no,
                 user=name,
+                userPhone=mask_phone(phone_raw) if phone_raw else "—",
+                productTitle=product_title,
+                qty=qty,
                 amount=cents_to_yuan(order.pay_amount_cents),
                 status=ORDER_STATUS_LABEL.get(order.status, order.status),
+                statusCode=order.status,
                 createdAt=format_dt(order.created_at) or "",
             )
         )
@@ -152,6 +160,7 @@ async def list_users(
         )
         name = user.nickname or f"用户{user.user_no}"
         phone = mask_phone(user.phone) if user.phone else "—"
+        status_label = "活跃" if user.status == UserStatus.ACTIVE else "已禁用"
         rows.append(
             AdminUserRowOut(
                 id=user.user_no,
@@ -159,6 +168,9 @@ async def list_users(
                 phone=phone,
                 orders=order_count or 0,
                 spent=cents_to_yuan(int(spent_cents or 0)),
+                registeredAt=(format_dt(user.created_at) or "")[:10],
+                status=user.status,
+                statusLabel=status_label,
             )
         )
     return rows

@@ -86,3 +86,4 @@ alembic upgrade head
 
 - 业务 JSON：`{ "code": 200, "message": "ok", "data": ... }` 表示成功；`code: 500` 表示业务失败（详见 [后端开发方案-v5](docs/后端开发方案-v5.md)）。
 - 小程序需 **微信授权登录**；收货地址使用 `/api/v1/addresses` 管理，下单传 `addressId`（或兼容传 `receiver`），订单表仍快照收件信息。
+- 手机号统一校验：大陆 11 位、`1[3-9]` 开头（`app/utils/phone.py`）；下单收件人、地址簿均适用。
