@@ -328,6 +328,27 @@ async def ship_order(
     return order_to_detail(order, mask_receiver_phone=False)
 
 
+async def confirm_receipt(
+    session: AsyncSession, user: User, order_no: str
+) -> OrderDetailOut:
+    order = await _load_order(session, order_no, user.id)
+    if order.status == OrderStatus.COMPLETED:
+        return order_to_detail(order)
+    if order.status != OrderStatus.SHIPPED:
+        raise BusinessError("仅已发货订单可确认收货")
+
+    now = now_cn()
+    prev = order.status
+    order.status = OrderStatus.COMPLETED
+    order.completed_at = now
+    await _log_status(
+        session, order, prev, order.status, "user", user.user_no, "用户确认收货"
+    )
+    await session.commit()
+    order = await _load_order(session, order_no, user.id)
+    return order_to_detail(order)
+
+
 async def close_expired_orders(session: AsyncSession) -> int:
     now = now_cn()
     result = await session.execute(

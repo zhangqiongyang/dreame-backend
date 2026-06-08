@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.response import ApiResponse, success
-from app.schemas.auth import ProfileUpdateIn, WechatLoginIn, WechatLoginOut
+from app.schemas.auth import PhoneBindIn, ProfileUpdateIn, WechatLoginIn, WechatLoginOut
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -22,4 +22,10 @@ async def me(user: CurrentUser) -> ApiResponse:
 @router.patch("/profile", response_model=ApiResponse)
 async def update_profile(body: ProfileUpdateIn, db: DbSession, user: CurrentUser) -> ApiResponse:
     data = await auth_service.update_profile(db, user, body)
+    return success(data)
+
+
+@router.post("/phone", response_model=ApiResponse)
+async def bind_phone(body: PhoneBindIn, db: DbSession, user: CurrentUser) -> ApiResponse:
+    data = await auth_service.bind_phone(db, user, body.code)
     return success(data)

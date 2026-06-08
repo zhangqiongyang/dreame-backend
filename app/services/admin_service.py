@@ -17,6 +17,11 @@ from app.utils.datetime_util import format_dt, now_cn
 from app.utils.money import cents_to_yuan, mask_phone
 
 
+def _phone_authorized_filter():
+    """仅展示已完成手机号授权的用户（与小程序「已登录」定义一致）。"""
+    return User.phone.is_not(None)
+
+
 def _shanghai_today_range() -> tuple[datetime, datetime]:
     now = now_cn()
     start = datetime.combine(now.date(), time.min)
@@ -42,7 +47,11 @@ async def get_dashboard(session: AsyncSession) -> DashboardOut:
         select(func.count(Order.id)).where(Order.status == OrderStatus.PENDING_SHIPPING)
     )
     new_users = await session.scalar(
-        select(func.count(User.id)).where(User.created_at >= start, User.created_at < end)
+        select(func.count(User.id)).where(
+            User.created_at >= start,
+            User.created_at < end,
+            _phone_authorized_filter(),
+        )
     )
 
     return DashboardOut(
@@ -130,7 +139,7 @@ async def get_admin_order_detail(session: AsyncSession, order_no: str) -> Dict[s
 async def list_users(
     session: AsyncSession, *, keyword: Optional[str] = None, page: int = 1, page_size: int = 20
 ) -> List[AdminUserRowOut]:
-    q = select(User).order_by(User.created_at.desc())
+    q = select(User).where(_phone_authorized_filter()).order_by(User.created_at.desc())
     if keyword:
         kw = f"%{keyword.strip()}%"
         q = q.where(

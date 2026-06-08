@@ -46,3 +46,10 @@ async def pay_mock(order_id: str, db: DbSession, user: CurrentUser) -> ApiRespon
 async def cancel_order(order_id: str, db: DbSession, user: CurrentUser) -> ApiResponse:
     await order_service.cancel_order(db, user, order_id)
     return success()
+
+
+@router.post("/{order_id}/confirm-receipt", response_model=ApiResponse[OrderDetailOut])
+async def confirm_receipt(
+    order_id: str, db: DbSession, user: CurrentUser
+) -> ApiResponse[OrderDetailOut]:
+    return success(await order_service.confirm_receipt(db, user, order_id))

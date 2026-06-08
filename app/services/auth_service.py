@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from sqlalchemy import select
@@ -16,7 +17,7 @@ from app.services.wechat import is_wechat_mock_mode
 from app.utils.datetime_util import now_cn
 from app.utils.ids import IdPrefix, generate_unique_id, is_valid_business_id
 
-
+logger = logging.getLogger(__name__)
 def user_to_out(user: User) -> UserOut:
     return UserOut(
         id=user.user_no,
@@ -32,6 +33,35 @@ async def _allocate_user_no(session: AsyncSession) -> str:
         return r.scalar_one_or_none() is not None
 
     return await generate_unique_id(session, IdPrefix.USER, exists_query=exists)
+
+
+async def _inherit_phone_from_unionid_sibling(
+    session: AsyncSession, user: User, unionid: Optional[str]
+) -> None:
+    """同一微信 unionid 下若存在已绑手机的历史账号，登录时同步到当前 openid 账号。"""
+    if user.phone or not unionid:
+        return
+    result = await session.execute(
+        select(User)
+        .where(
+            User.unionid == unionid,
+            User.id != user.id,
+            User.phone.is_not(None),
+        )
+        .order_by(User.last_login_at.desc())
+        .limit(1)
+    )
+    sibling = result.scalar_one_or_none()
+    if not sibling or not sibling.phone:
+        return
+    user.phone = sibling.phone
+    sibling.phone = None
+    logger.info(
+        "登录同步手机号: from_user=%s to_user=%s phone=%s…",
+        sibling.user_no,
+        user.user_no,
+        sibling.phone[:3],
+    )
 
 
 async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginOut:
@@ -60,6 +90,9 @@ async def login_by_wechat_code(session: AsyncSession, code: str) -> WechatLoginO
         user.session_key = wx.get("session_key")
         user.unionid = wx.get("unionid") or user.unionid
         user.last_login_at = now
+
+    unionid = wx.get("unionid") or user.unionid
+    await _inherit_phone_from_unionid_sibling(session, user, unionid)
 
     await session.commit()
     await session.refresh(user)
@@ -99,6 +132,34 @@ async def update_profile(session: AsyncSession, user: User, body: ProfileUpdateI
         user.nickname = body.nickname
     if body.avatarUrl is not None:
         user.avatar_url = body.avatarUrl
+    await session.commit()
+    await session.refresh(user)
+    return user_to_out(user)
+
+
+async def bind_phone(session: AsyncSession, user: User, code: str) -> UserOut:
+    phone = await wechat_client.get_phone_number(code)
+
+    if user.phone == phone:
+        return user_to_out(user)
+
+    result = await session.execute(
+        select(User).where(User.phone == phone, User.id != user.id).limit(1)
+    )
+    other = result.scalar_one_or_none()
+    if other:
+        # 微信 getPhoneNumber 已验证归属，从旧 openid 账号收回手机号
+        logger.info(
+            "手机号迁移: from_user=%s(openid=%s…) to_user=%s phone=%s…",
+            other.user_no,
+            str(other.openid)[:8],
+            user.user_no,
+            phone[:3],
+        )
+        other.phone = None
+        await session.flush()
+
+    user.phone = phone
     await session.commit()
     await session.refresh(user)
     return user_to_out(user)

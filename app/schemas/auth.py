@@ -23,3 +23,7 @@ class WechatLoginOut(BaseModel):
 class ProfileUpdateIn(BaseModel):
     nickname: Optional[str] = None
     avatarUrl: Optional[str] = None
+
+
+class PhoneBindIn(BaseModel):
+    code: str = Field(min_length=1)

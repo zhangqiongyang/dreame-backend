@@ -49,6 +49,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_addresses_address_no", table_name="user_addresses")
-    op.drop_index("ix_user_addresses_user_id", table_name="user_addresses")
+    # MySQL：外键依赖 user_id 索引，直接 drop_table 即可连带删除
     op.drop_table("user_addresses")
