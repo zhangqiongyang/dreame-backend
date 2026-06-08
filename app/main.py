@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,17 +9,13 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import _ENV_FILE, settings
+from app.core.logging_config import setup_logging
 from app.services.wechat import is_wechat_mock_mode, wechat_mock_reason
 from app.core.exceptions import BusinessError, UnauthorizedError
 from app.core.response import fail
 from app.tasks.order_expire import order_maintenance_loop
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s %(name)s: %(message)s",
-    stream=sys.stdout,
-    force=True,
-)
+setup_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _wechat_mode_label: str = ""
