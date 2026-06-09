@@ -65,8 +65,14 @@ def _first_item(order: Order) -> OrderItem:
     return order.items[0]
 
 
-def order_to_list_item(order: Order) -> OrderListItemOut:
+def order_to_list_item(order: Order, product: Optional[Product] = None) -> OrderListItemOut:
     item = _first_item(order)
+    spec = None
+    hot = False
+    if product is not None:
+        hot = bool(product.is_hot)
+        if product.spec_tags:
+            spec = " | ".join(str(t) for t in product.spec_tags)
     return OrderListItemOut(
         id=order.order_no,
         orderNo=order.order_no,
@@ -75,6 +81,8 @@ def order_to_list_item(order: Order) -> OrderListItemOut:
         qty=item.qty,
         amount=cents_to_yuan(order.pay_amount_cents),
         thumb=item.thumb,
+        spec=spec,
+        hot=hot,
     )
 
 
@@ -294,7 +302,18 @@ async def list_orders(
 
     offset = max(page - 1, 0) * page_size
     result = await session.execute(q.offset(offset).limit(min(page_size, 100)))
-    return [order_to_list_item(o) for o in result.scalars().unique().all()]
+    orders = result.scalars().unique().all()
+    product_ids = {_first_item(o).product_id for o in orders}
+    product_map: dict[str, Product] = {}
+    if product_ids:
+        products_result = await session.execute(
+            select(Product).where(Product.id.in_(product_ids))
+        )
+        product_map = {p.id: p for p in products_result.scalars().all()}
+    return [
+        order_to_list_item(o, product_map.get(_first_item(o).product_id))
+        for o in orders
+    ]
 
 
 async def get_order_detail(session: AsyncSession, user: User, order_no: str) -> OrderDetailOut:

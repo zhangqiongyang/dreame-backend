@@ -28,6 +28,8 @@ class OrderListItemOut(BaseModel):
     qty: int
     amount: int
     thumb: str
+    spec: Optional[str] = None
+    hot: bool = False
 
 
 class ShipmentOut(BaseModel):
