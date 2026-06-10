@@ -40,6 +40,17 @@ REFUND_STATUS_LABEL: dict[str, str] = {
 }
 
 
+class ProductStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+PRODUCT_STATUS_LABEL: dict[str, str] = {
+    ProductStatus.ACTIVE: "在售",
+    ProductStatus.INACTIVE: "已下架",
+}
+
+
 REFUND_REASONS = [
     "多拍/错拍",
     "不想要了",
