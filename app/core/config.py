@@ -41,6 +41,10 @@ class Settings(BaseSettings):
 
     cors_origins: str = "*"
 
+    backend_root: Path = _BACKEND_ROOT
+    upload_dir: str = "uploads"
+    public_base_url: str = ""
+
     @field_validator("wechat_mock", mode="before")
     @classmethod
     def _parse_bool(cls, v: Any) -> bool:

@@ -2,10 +2,13 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import _ENV_FILE, settings
@@ -110,6 +113,12 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 app.include_router(api_router, prefix="/api/v1")
+
+_upload_root = settings.upload_dir
+if not Path(_upload_root).is_absolute():
+    _upload_root = settings.backend_root / _upload_root
+Path(_upload_root).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_upload_root)), name="uploads")
 
 
 @app.get("/health")

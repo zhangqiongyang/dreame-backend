@@ -20,6 +20,11 @@ from app.utils.ids import IdPrefix, generate_unique_id
 from app.utils.money import cents_to_yuan, yuan_to_cents
 
 
+def _normalize_hero_images(product: Product) -> list[str]:
+    raw = product.hero_images or []
+    return [str(url) for url in raw if url]
+
+
 def product_to_card(p: Product) -> ProductCardOut:
     return ProductCardOut(
         id=p.id,
@@ -37,12 +42,11 @@ def product_to_detail(p: Product) -> ProductDetailOut:
         **card.model_dump(),
         marketPrice=cents_to_yuan(p.market_price_cents) if p.market_price_cents else None,
         promo=p.promo,
-        title=p.title,
         specTags=p.spec_tags or [],
         params=p.params or [],
         highlights=p.highlights or [],
         detailImages=p.detail_images or [],
-        heroImage=p.hero_image,
+        heroImages=_normalize_hero_images(p),
     )
 
 
@@ -70,14 +74,13 @@ def product_to_admin_out(p: Product) -> AdminProductOut:
     return AdminProductOut(
         id=p.id,
         name=p.name,
-        title=p.title,
         price=cents_to_yuan(p.price_cents),
         marketPrice=cents_to_yuan(p.market_price_cents) if p.market_price_cents else None,
         promo=p.promo,
         tags=p.tags or [],
         specTags=p.spec_tags or [],
         coverUrl=p.cover_url,
-        heroImage=p.hero_image,
+        heroImages=_normalize_hero_images(p),
         detailImages=p.detail_images or [],
         params=p.params or [],
         highlights=p.highlights or [],
@@ -91,14 +94,13 @@ def product_to_admin_out(p: Product) -> AdminProductOut:
 
 def _apply_product_in(product: Product, body: AdminProductIn) -> None:
     product.name = body.name
-    product.title = body.title
     product.price_cents = yuan_to_cents(body.price)
     product.market_price_cents = yuan_to_cents(body.marketPrice) if body.marketPrice else None
     product.promo = None
     product.tags = body.tags
     product.spec_tags = body.specTags
     product.cover_url = str(body.coverUrl)
-    product.hero_image = str(body.heroImage)
+    product.hero_images = [str(url) for url in body.heroImages]
     product.detail_images = [str(url) for url in body.detailImages]
     product.params = [item.model_dump() for item in body.params]
     product.highlights = [item.model_dump() for item in body.highlights]
@@ -148,7 +150,7 @@ async def list_admin_products(
     if keyword:
         kw = f"%{keyword.strip()}%"
         q = q.where(
-            or_(Product.id.like(kw), Product.name.like(kw), Product.title.like(kw))
+            or_(Product.id.like(kw), Product.name.like(kw))
         )
 
     offset = max(page - 1, 0) * page_size
@@ -174,14 +176,13 @@ async def create_product(session: AsyncSession, body: AdminProductIn) -> AdminPr
     product = Product(
         id=product_id,
         name=body.name,
-        title=body.title,
         price_cents=yuan_to_cents(body.price),
         market_price_cents=yuan_to_cents(body.marketPrice) if body.marketPrice else None,
         promo=None,
         tags=body.tags,
         spec_tags=body.specTags or [],
         cover_url=str(body.coverUrl),
-        hero_image=str(body.heroImage),
+        hero_images=[str(url) for url in body.heroImages],
         detail_images=[str(url) for url in body.detailImages],
         params=[item.model_dump() for item in body.params],
         highlights=[item.model_dump() for item in body.highlights],

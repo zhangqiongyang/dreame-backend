@@ -191,7 +191,7 @@ async def create_order(session: AsyncSession, user: User, body: CreateOrderIn) -
         OrderItem(
             order_id=order.id,
             product_id=product.id,
-            title=product.title,
+            title=product.name,
             thumb=product.cover_url,
             unit_price_cents=product.price_cents,
             qty=body.qty,

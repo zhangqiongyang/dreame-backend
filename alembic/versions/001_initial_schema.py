@@ -198,7 +198,7 @@ def upgrade() -> None:
                 "is_hot": p["is_hot"],
                 "sort": p["sort"],
                 "status": "active",
-                "title": p["title"],
+                "title": p["name"],
                 "promo": p.get("promo"),
                 "spec_tags": p["spec_tags"],
                 "params": p["params"],

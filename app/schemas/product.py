@@ -15,12 +15,11 @@ class ProductCardOut(BaseModel):
 class ProductDetailOut(ProductCardOut):
     marketPrice: Optional[int] = None
     promo: Optional[str] = None
-    title: str
     specTags: List[str]
     params: List[dict]
     highlights: List[dict]
     detailImages: List[str]
-    heroImage: str
+    heroImages: List[str]
 
 
 class ProductParamIn(BaseModel):
@@ -35,13 +34,12 @@ class ProductHighlightIn(BaseModel):
 
 class AdminProductIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
-    title: str = Field(min_length=1, max_length=512)
     price: int = Field(gt=0)
     marketPrice: Optional[int] = Field(default=None, gt=0)
     tags: List[str] = Field(min_length=1)
     specTags: List[str] = Field(default_factory=list)
     coverUrl: HttpUrl
-    heroImage: HttpUrl
+    heroImages: List[HttpUrl] = Field(min_length=1)
     detailImages: List[HttpUrl] = Field(min_length=1)
     params: List[ProductParamIn] = Field(min_length=1)
     highlights: List[ProductHighlightIn] = Field(min_length=1)

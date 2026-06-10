@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     admin_orders,
     admin_products,
     admin_refunds,
+    admin_upload,
     admin_users,
     auth,
     health,
@@ -27,4 +28,5 @@ api_router.include_router(admin_dashboard.router)
 api_router.include_router(admin_orders.router)
 api_router.include_router(admin_products.router)
 api_router.include_router(admin_refunds.router)
+api_router.include_router(admin_upload.router)
 api_router.include_router(admin_users.router)

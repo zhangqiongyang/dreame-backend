@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -89,6 +91,33 @@ def test_products_list_envelope():
         assert isinstance(body["data"], list)
 
 
+_MIN_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+def test_admin_upload_requires_auth():
+    r = client.post(
+        "/api/v1/admin/upload/image",
+        files={"file": ("test.png", _MIN_PNG, "image/png")},
+    )
+    assert r.status_code == 401
+
+
+def test_admin_upload_image_success():
+    token = _admin_token()
+    r = client.post(
+        "/api/v1/admin/upload/image",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("test.png", _MIN_PNG, "image/png")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["code"] == 200
+    assert body["data"]["url"].startswith("http")
+    assert "/uploads/products/" in body["data"]["url"]
+
+
 def test_admin_products_requires_auth():
     r = client.get("/api/v1/admin/products")
     assert r.status_code == 401
@@ -105,12 +134,11 @@ def _admin_token() -> str:
 
 SAMPLE_PRODUCT = {
     "name": "测试商品",
-    "title": "测试商品长标题 5500Pa大吸力",
     "price": 1999,
     "marketPrice": 2499,
     "tags": ["测试标签"],
     "coverUrl": "https://example.com/cover.jpg",
-    "heroImage": "https://example.com/hero.jpg",
+    "heroImages": ["https://example.com/hero.jpg"],
     "detailImages": ["https://example.com/detail1.jpg"],
     "params": [{"label": "最大吸力", "value": "5500 Pa"}],
     "highlights": [{"title": "测试卖点", "desc": "测试描述"}],
