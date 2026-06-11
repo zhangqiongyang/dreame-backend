@@ -86,7 +86,19 @@ def order_to_list_item(order: Order, product: Optional[Product] = None) -> Order
     )
 
 
-def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderDetailOut:
+def _product_spec(product: Optional[Product]) -> Optional[str]:
+    if product is None:
+        return None
+    tags = product.spec_tags or product.tags or []
+    cleaned = [str(t) for t in tags if t]
+    if not cleaned:
+        return None
+    return " | ".join(cleaned[:2] if len(cleaned) > 2 else cleaned)
+
+
+def order_to_detail(
+    order: Order, *, mask_receiver_phone: bool = True, product: Optional[Product] = None
+) -> OrderDetailOut:
     item = _first_item(order)
     phone = mask_phone(order.receiver_phone) if mask_receiver_phone else order.receiver_phone
     shipment = None
@@ -114,6 +126,7 @@ def order_to_detail(order: Order, *, mask_receiver_phone: bool = True) -> OrderD
         status=order.status,
         statusLabel=ORDER_STATUS_LABEL.get(order.status, order.status),
         title=item.title,
+        spec=_product_spec(product),
         qty=item.qty,
         amount=cents_to_yuan(order.pay_amount_cents),
         thumb=item.thumb,
@@ -318,7 +331,10 @@ async def list_orders(
 
 async def get_order_detail(session: AsyncSession, user: User, order_no: str) -> OrderDetailOut:
     order = await _load_order(session, order_no, user.user_no)
-    return order_to_detail(order)
+    item = _first_item(order)
+    result = await session.execute(select(Product).where(Product.id == item.product_id).limit(1))
+    product = result.scalar_one_or_none()
+    return order_to_detail(order, product=product)
 
 
 async def ship_order(

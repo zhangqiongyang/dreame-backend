@@ -43,6 +43,7 @@ class OrderDetailOut(BaseModel):
     status: str
     statusLabel: str
     title: str
+    spec: Optional[str] = None
     qty: int
     amount: int
     thumb: str
