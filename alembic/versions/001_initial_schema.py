@@ -203,7 +203,7 @@ def upgrade() -> None:
                 "spec_tags": p["spec_tags"],
                 "params": p["params"],
                 "highlights": p["highlights"],
-                "hero_image": p["hero_image"],
+                "hero_image": (p.get("hero_image") or (p.get("hero_images") or [""])[0]),
                 "detail_images": p["detail_images"],
             }
         )
