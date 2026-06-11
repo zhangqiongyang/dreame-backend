@@ -13,3 +13,4 @@ uploads/
 deploy/.env
 deploy/ssl/*
 !deploy/ssl/.gitkeep
+deploy/nginx/generated.conf

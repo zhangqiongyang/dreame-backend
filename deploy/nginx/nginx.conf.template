@@ -1,22 +1,18 @@
-# 单域名 cuteyam.com：
-#   /admin/     → 管理后台
-#   /api/       → 后端 API
-#   /uploads/   → 商品图片
-#   /health     → 健康检查
+# 由 deploy.sh 根据 .env 中 SITE_DOMAIN 生成 generated.conf
+# 测试: cuteyam.com  生产: dreamewindowcleaningrobot.com
 
-# 使用 Docker 内置 DNS，避免 api 容器未就绪时 nginx 启动失败
 resolver 127.0.0.11 valid=10s ipv6=off;
 
 server {
     listen 80;
-    server_name cuteyam.com www.cuteyam.com;
+    server_name __SITE_DOMAIN__ www.__SITE_DOMAIN__;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
     http2 on;
-    server_name cuteyam.com www.cuteyam.com;
+    server_name __SITE_DOMAIN__ www.__SITE_DOMAIN__;
 
     root /usr/share/nginx/html;
 

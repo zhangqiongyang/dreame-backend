@@ -1,6 +1,6 @@
-# 腾讯云单域名部署：cuteyam.com
-# 在 dreame-backend/deploy 目录执行：docker compose up -d --build
-# 要求 dreame-backend 与 dreame-web-support 为同级目录
+# 单域名部署（域名由 .env 中 SITE_DOMAIN 决定）
+# 测试: cuteyam.com  生产: dreamewindowcleaningrobot.com
+# 在 dreame-backend/deploy 目录执行：./deploy.sh up
 
 services:
   db:
@@ -28,6 +28,18 @@ services:
       context: ..
       dockerfile: Dockerfile
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
     environment:
       APP_NAME: Dreame API
       DEBUG: ${DEBUG:-false}
@@ -65,8 +77,10 @@ services:
       - "443:443"
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
+      - ./nginx/generated.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   mysql_data:

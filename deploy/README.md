@@ -1,123 +1,194 @@
-# Docker 部署（腾讯云 OpenCloudOS · 单域名 cuteyam.com）
+# Dreame 服务器部署指南
+
+支持 **测试环境** 与 **生产环境** 两套域名，通过 `.env` 切换。
+
+| 环境 | 域名 | 用途 |
+|------|------|------|
+| 测试 staging | `cuteyam.com` | 联调、预发布 |
+| 生产 production | `dreamewindowcleaningrobot.com` | 正式上线 |
+
+---
 
 ## 架构
 
-| 路径 | 服务 |
-|------|------|
-| `https://cuteyam.com/admin/` | 管理后台 |
-| `https://cuteyam.com/api/v1/...` | 后端 API |
-| `https://cuteyam.com/uploads/...` | 商品图片 |
-| `https://cuteyam.com/health` | 健康检查 |
-
-访问根路径 `https://cuteyam.com/` 会自动跳转到 `/admin/`。
-
-小程序 `VITE_API_BASE_URL` 填：`https://cuteyam.com`（与 `PUBLIC_BASE_URL` 一致，**不要**加 `/admin`）。
-
-## 服务器目录结构
-
-只需 clone **两个仓库**，且必须为**同级目录**：
-
 ```
-/opt/zhuimi/                      # 父目录，名称可自定
-├── dreame-backend/               # 含本 deploy 目录
-│   └── deploy/
-└── dreame-web-support/           # 管理后台源码（构建进 nginx 镜像）
+https://<SITE_DOMAIN>
+        │
+   nginx :443
+   ├── /admin/    管理后台
+   ├── /api/      FastAPI
+   └── /uploads/  图片
 ```
 
-小程序 `dreame-web-mini` **不必**部署到服务器，在本机构建后上传微信即可。
+小程序 `VITE_API_BASE_URL` = `PUBLIC_BASE_URL`（**不要**加 `/admin`）。
 
-### 首次 clone
+---
+
+## 快速开始
+
+### 1. 服务器初始化（仅一次）
 
 ```bash
-sudo mkdir -p /opt/zhuimi
-sudo chown $USER:$USER /opt/zhuimi
-cd /opt/zhuimi
-
-git clone https://github.com/zhangqiongyang/dreame-backend.git
-git clone https://github.com/zhangqiongyang/dreame-web-support.git
+ssh root@服务器IP
+cd /opt/zhuimi/dreame-backend/deploy
+chmod +x setup-server.sh deploy.sh
+./setup-server.sh
 ```
 
-私有仓库请使用 SSH 或 HTTPS + Token。
-
-## 前置条件
-
-1. 腾讯云 CVM（建议 2核4G+），系统 **OpenCloudOS 9**（或其他支持 Docker 的 Linux）
-2. 域名 `cuteyam.com` 已备案，A 记录指向服务器公网 IP
-3. 安全组放行 **80、443**
-4. 已安装 Docker 与 Compose 插件
-
-### OpenCloudOS 安装 Docker
+### 2. 选择环境并创建配置
 
 ```bash
-sudo yum install -y docker docker-compose-plugin
-sudo systemctl enable --now docker
-sudo usermod -aG docker $USER
-# 重新登录后
-docker compose version
-```
+# 测试环境（当前服务器 152.136.63.163）
+./deploy.sh init staging
+vim .env
 
-若官方源无 compose 插件，可参考 [Docker 官方安装文档](https://docs.docker.com/engine/install/centos/) 使用 `docker-ce` 源。
-
-## 一、SSL 证书
-
-将腾讯云证书放到 `dreame-backend/deploy/ssl/`：
-
-```
-deploy/ssl/fullchain.pem
-deploy/ssl/privkey.pem
-```
-
-腾讯云：SSL 证书 → 下载 Nginx 证书 → `xxx_bundle.crt` → `fullchain.pem`，`xxx.key` → `privkey.pem`。
-
-## 二、配置环境变量
-
-```bash
-cd dreame-backend/deploy
-cp .env.example .env
+# 生产环境（新服务器）
+./deploy.sh init production
 vim .env
 ```
 
-## 三、启动
+### 3. 上传对应域名的 SSL 证书
 
-```bash
-cd dreame-backend/deploy
-docker compose up -d --build
+证书域名须与 `SITE_DOMAIN` 一致，放到 `deploy/ssl/`：
+
+```
+fullchain.pem
+privkey.pem
 ```
 
-验证：
+Mac 上传示例（测试环境）：
 
 ```bash
-curl https://cuteyam.com/health
-curl -I https://cuteyam.com/admin/
+scp cuteyam.com_bundle.crt root@152.136.63.163:/opt/zhuimi/dreame-backend/deploy/ssl/fullchain.pem
+scp cuteyam.com.key root@152.136.63.163:/opt/zhuimi/dreame-backend/deploy/ssl/privkey.pem
 ```
 
-管理后台：**https://cuteyam.com/admin/** ，使用 `.env` 中 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
-
-## 四、发布微信小程序
-
-在本机构建：
+### 4. 启动
 
 ```bash
-cd dreame-web-mini
-npm run build:mp-weixin
+./deploy.sh check
+./deploy.sh up
+./deploy.sh verify
 ```
 
-微信公众平台 → 服务器域名：`https://cuteyam.com`（request / downloadFile / uploadFile）。
+- 测试后台：https://cuteyam.com/admin/
+- 生产后台：https://dreamewindowcleaningrobot.com/admin/
 
-## 五、更新部署
+---
+
+## 环境配置对照
+
+### 服务器 `deploy/.env`
+
+| 变量 | 测试 staging | 生产 production |
+|------|--------------|-----------------|
+| `SITE_DOMAIN` | `cuteyam.com` | `dreamewindowcleaningrobot.com` |
+| `PUBLIC_BASE_URL` | `https://cuteyam.com` | `https://dreamewindowcleaningrobot.com` |
+| `CORS_ORIGINS` | `https://cuteyam.com,https://www.cuteyam.com` | `https://dreamewindowcleaningrobot.com,https://www.dreamewindowcleaningrobot.com` |
+
+模板文件：`.env.staging.example` / `.env.production.example`
+
+### 管理后台 `dreame-web-support`
+
+| 文件 | API 地址 |
+|------|----------|
+| `.env.staging` | `https://cuteyam.com` |
+| `.env.production` | `https://dreamewindowcleaningrobot.com` |
+
+服务器 Docker 构建时通过 `PUBLIC_BASE_URL` 注入，**以服务器 `.env` 为准**。
+
+本地构建（一般不需要，仅调试）：
 
 ```bash
-cd /opt/zhuimi/dreame-backend && git pull
-cd /opt/zhuimi/dreame-web-support && git pull
-cd /opt/zhuimi/dreame-backend/deploy && docker compose up -d --build
+npm run build:staging      # 测试
+npm run build:production   # 生产
 ```
 
-## 六、故障排查
+### 小程序 `dreame-web-mini`
+
+| 文件 | API 地址 |
+|------|----------|
+| `.env.staging` | `https://cuteyam.com` |
+| `.env.production` | `https://dreamewindowcleaningrobot.com` |
+
+```bash
+# 测试版小程序
+npm run build:mp-weixin:staging
+
+# 正式版小程序
+npm run build:mp-weixin:production
+```
+
+微信公众平台 → 服务器域名须与构建环境一致。
+
+---
+
+## 目录结构
+
+```
+/opt/zhuimi/
+├── dreame-backend/deploy/
+│   ├── .env                 # 当前服务器环境配置
+│   ├── deploy.sh
+│   ├── ssl/                 # 与 SITE_DOMAIN 匹配的证书
+│   └── nginx/
+│       ├── nginx.conf.template
+│       └── generated.conf   # deploy.sh 自动生成
+└── dreame-web-support/
+```
+
+Gitee clone：
+
+```bash
+git clone https://gitee.com/zhangqiongyang/dreame-backend.git
+git clone https://gitee.com/zhangqiongyang/dreame-web-support.git
+```
+
+---
+
+## deploy.sh 命令
+
+| 命令 | 说明 |
+|------|------|
+| `./deploy.sh init staging` | 创建测试环境 .env |
+| `./deploy.sh init production` | 创建生产环境 .env |
+| `./deploy.sh check` | 检查配置、证书、生成 nginx |
+| `./deploy.sh up` | 构建并启动 |
+| `./deploy.sh update` | git pull + 重新构建 |
+| `./deploy.sh verify` | 验证 health / admin / api |
+
+---
+
+## 两台服务器部署建议
+
+| 服务器 | 环境 | .env | 证书 |
+|--------|------|------|------|
+| 152.136.63.163（现有） | 测试 | `init staging` | cuteyam.com |
+| 新 CVM | 生产 | `init production` | dreamewindowcleaningrobot.com |
+
+测试与生产应使用 **不同的数据库密码、JWT_SECRET**，互不影响。
+
+---
+
+## 日常更新
+
+```bash
+cd /opt/zhuimi/dreame-backend/deploy
+./deploy.sh update
+```
+
+---
+
+## 故障排查
 
 | 现象 | 处理 |
 |------|------|
-| `/admin/` 白屏 | 重新 `docker compose up -d --build nginx`，确认静态资源路径含 `/admin/assets/` |
-| 502 | `docker compose logs api` |
-| 登录后 401 跳错路径 | 确认已用最新代码构建（登录页在 `/admin/login`） |
-| 图片不显示 | `PUBLIC_BASE_URL=https://cuteyam.com`，微信 downloadFile 域名已配置 |
-| build 找不到 dreame-web-support | 确认两个仓库在同一父目录下，见「服务器目录结构」 |
+| nginx 证书错误 | 确认 SSL 域名与 `SITE_DOMAIN` 一致 |
+| API 404 | 确认 `nginx/generated.conf` 已生成，`./deploy.sh up` |
+| 管理后台请求错域名 | 重建 nginx：`./deploy.sh up`（会按 `.env` 重新构建前端） |
+
+```bash
+./deploy.sh logs api
+./deploy.sh logs nginx
+grep SITE_DOMAIN .env
+```
