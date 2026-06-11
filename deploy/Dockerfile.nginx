@@ -1,0 +1,22 @@
+FROM node:20-alpine AS support-build
+
+WORKDIR /support
+
+COPY dreame-web-support/package.json dreame-web-support/package-lock.json ./
+RUN npm ci
+
+COPY dreame-web-support/ .
+
+ARG VITE_API_BASE_URL=https://cuteyam.com
+ARG VITE_BASE=/admin/
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_BASE=${VITE_BASE}
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY dreame-backend/deploy/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=support-build /support/dist /usr/share/nginx/html/admin
+
+EXPOSE 80 443

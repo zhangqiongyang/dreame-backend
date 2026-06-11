@@ -10,3 +10,6 @@ __pycache__/
 dist/
 uploads/
 !uploads/.gitkeep
+deploy/.env
+deploy/ssl/*
+!deploy/ssl/.gitkeep

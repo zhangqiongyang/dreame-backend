@@ -1,0 +1,73 @@
+# 腾讯云单域名部署：cuteyam.com
+# 在 dreame-backend/deploy 目录执行：docker compose up -d --build
+# 要求 dreame-backend 与 dreame-web-support 为同级目录
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: dreame
+      MYSQL_USER: dreame
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_NAME: Dreame API
+      DEBUG: ${DEBUG:-false}
+      DATABASE_URL: mysql+aiomysql://dreame:${MYSQL_PASSWORD}@db:3306/dreame?charset=utf8mb4
+      DATABASE_URL_SYNC: mysql+pymysql://dreame:${MYSQL_PASSWORD}@db:3306/dreame?charset=utf8mb4
+      WECHAT_APPID: ${WECHAT_APPID}
+      WECHAT_SECRET: ${WECHAT_SECRET}
+      WECHAT_MOCK: ${WECHAT_MOCK:-false}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_SECONDS: ${JWT_EXPIRE_SECONDS:-604800}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-Admin}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ORDER_EXPIRE_HOURS: ${ORDER_EXPIRE_HOURS:-24}
+      AUTO_COMPLETE_SHIPPED_DAYS: ${AUTO_COMPLETE_SHIPPED_DAYS:-7}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      UPLOAD_DIR: uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    build:
+      context: ../..
+      dockerfile: dreame-backend/deploy/Dockerfile.nginx
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+
+volumes:
+  mysql_data:
+  uploads_data:
